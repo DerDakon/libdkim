@@ -1,0 +1,37 @@
+Alt-N DKIM Open Source Project
+Copyright 2005 Alt-N Technologies, Ltd.
+
+
+-------------------
+1.0.6 July 14, 2005  initial release
+-------------------
+
+
+This library implements DKIM (DomainKeys Identified Mail).  The
+internet drafts are available here:
+
+http://www.ietf.org/internet-drafts/draft-allman-dkim-base-00.txt
+http://www.ietf.org/internet-drafts/draft-allman-dkim-ssp-00.txt
+
+
+Build Instructions
+------------------
+
+You must have OpenSSL installed and built.
+
+http://www.openssl.org/
+
+For Win32,
+  - Edit the make file Makefile.vc and set the OpenSSL include and lib
+    paths (OPENSSL_INC and OPENSSL_LIB)
+  - Run "nmake /f Makefile.vc"
+
+For Unix,
+  - Run "make"
+
+
+Usage
+-------
+
+See libdkimtest.cpp for an example of how to call the library.
+
