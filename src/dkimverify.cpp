@@ -510,7 +510,12 @@ int CDKIMVerify::GetResults(void)
 	{
 		for (list<string>::iterator i = SuccessfulDomains.begin(); i != SuccessfulDomains.end(); ++i)
 		{
-			if (stricmp(i->c_str(), sFromDomain.c_str()) == 0)
+			// see if the successful domain is the same as or a parent of the From domain
+			if (i->length() > sFromDomain.length())
+				continue;
+			if (stricmp(i->c_str(), sFromDomain.c_str()+sFromDomain.length()-i->length()) != 0)
+				continue;
+			if (i->length() == sFromDomain.length() || sFromDomain.c_str()[sFromDomain.length()-i->length()-1] == '.')
 			{
 				return SuccessCount == Signatures.size() ? DKIM_SUCCESS : DKIM_PARTIAL_SUCCESS;
 			}
@@ -1134,7 +1139,7 @@ SelectorInfo &CDKIMVerify::GetSelector( const string &sSelector, const string &s
 ////////////////////////////////////////////////////////////////////////////////
 int CDKIMVerify::GetPolicy( const string &sDomain, int &iPolicy, bool &bTesting)
 {
-	string sFQDN = "_policy.";
+	string sFQDN = "_policy._domainkey.";
 	sFQDN += sDomain;
 
 	char Buffer[1024];

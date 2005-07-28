@@ -455,7 +455,7 @@ int DNSGetPolicy( const char* szUser, const char* szDomain, char* Buffer, int nB
 	}
 
 
-	if( strlen(szDomain) + nUserStrLen > MAX_DOMAIN - 11 )
+	if( strlen(szDomain) + nUserStrLen > MAX_DOMAIN - 20 )
 		return DNSRESP_DOMAIN_NAME_TOO_LONG;
 
 	// construct the subdomain to query
@@ -463,11 +463,11 @@ int DNSGetPolicy( const char* szUser, const char* szDomain, char* Buffer, int nB
 	if( nUserStrLen > 0 )
 	{
 		strcpy( szSubDomain, szUser );
-		strcat( szSubDomain, "._policy." );
+		strcat( szSubDomain, "._policy._domainkey." );
 	}
 	else
 	{
-		strcpy( szSubDomain, "_policy." );
+		strcpy( szSubDomain, "_policy.._domainkey." );
 	}
 	strcat( szSubDomain, szDomain );
 
