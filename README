@@ -3,8 +3,23 @@ Copyright 2005 Alt-N Technologies, Ltd.
 
 
 -------------------
-1.0.6 July 14, 2005  initial release
+1.0.8 July 28, 2005
 -------------------
+  o fix to verifier requesting policy records from the wrong
+    location
+  o the policy is no longer checked if the From domain is a 
+    subdomain of any of the successful signing domains
+
+-------------------
+1.0.7 July 21, 2005
+-------------------
+  o added option to honor/ignore body length tags when verifying
+    default is to ignore
+
+-------------------
+1.0.6 July 14, 2005
+-------------------
+  o initial release
 
 
 This library implements DKIM (DomainKeys Identified Mail).  The
