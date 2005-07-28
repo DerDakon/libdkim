@@ -375,6 +375,7 @@ CDKIMVerify::CDKIMVerify()
 {
 	m_pfnSelectorCallback = NULL;
 	m_pfnPolicyCallback = NULL;
+	m_HonorBodyLengthTag = false;
 }
 
 CDKIMVerify::~CDKIMVerify()
@@ -399,6 +400,8 @@ int CDKIMVerify::Init( DKIMVerifyOptions* pOptions )
 	if (m_pfnPolicyCallback)
 		assert(!IsBadCodePtr( (FARPROC) m_pfnPolicyCallback ));
 #endif
+
+	m_HonorBodyLengthTag = pOptions->nHonorBodyLengthTag != 0;
 
 	return nRet;
 }
@@ -543,6 +546,10 @@ int CDKIMVerify::GetResults(void)
 
 	// if the message has a signature that didn't verify return fail
 	if (RealFailures > 0)
+		return DKIM_FAIL;
+
+	// if the policy is no email sent, return fail
+	if (iPolicy == DKIM_POLICY_NEVER_SENDS_EMAIL)
 		return DKIM_FAIL;
 
 	// return neutral for everything else?
@@ -815,7 +822,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	}
 
 	// body count
-	if (values[8] == NULL)
+	if (values[8] == NULL || !m_HonorBodyLengthTag)
 	{
 		sig.BodyLength = -1;
 	}

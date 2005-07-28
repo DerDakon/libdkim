@@ -107,6 +107,8 @@ protected:
 	DKIMDNSCALLBACK m_pfnSelectorCallback;		// selector record callback
 	DKIMDNSCALLBACK m_pfnPolicyCallback;		// policy record callback
 
+	bool m_HonorBodyLengthTag;
+
 	vector<DKIMVerifyDetails> Details;
 	string Policy;
 };

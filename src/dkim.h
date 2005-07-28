@@ -97,6 +97,7 @@ typedef struct DKIMVerifyOptions_t
 {
 	DKIMDNSCALLBACK pfnSelectorCallback;	// selector record callback
 	DKIMDNSCALLBACK pfnPolicyCallback;		// policy record callback
+	int nHonorBodyLengthTag;				// 0 = ignore l= tag, 1 = use l= tag to limit the amount of body verified
 } DKIMVerifyOptions;
 
 typedef struct DKIMVerifyDetails_t
