@@ -1,15 +1,15 @@
 # libdkim makefile for UNIX
 #
 
-.ifdef DEBUG
+#ifdef LINUX
 CFLAGS  = -c
 LFLAGS  = 
-LIBS    = -lcrypto
-.else
+LIBS    = -lcrypto -lresolv
+#else
 CFLAGS  = -c
 LFLAGS  = 
 LIBS    = -lcrypto 
-.endif
+#endif
 
 INCL	=  -I /usr/include/openssl/
 
