@@ -64,7 +64,8 @@ public:
 	string IdentityDomain;
 	vector<string> SignedHeaders;
 	unsigned BodyLength;
-	unsigned Canonicalization;
+	unsigned HeaderCanonicalization;
+	unsigned BodyCanonicalization;
 	unsigned ExpireTime;
 
 	unsigned VerifiedBodyCount;

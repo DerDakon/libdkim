@@ -467,7 +467,7 @@ int DNSGetPolicy( const char* szUser, const char* szDomain, char* Buffer, int nB
 	}
 	else
 	{
-		strcpy( szSubDomain, "_policy.._domainkey." );
+		strcpy( szSubDomain, "_policy._domainkey." );
 	}
 	strcat( szSubDomain, szDomain );
 

@@ -52,6 +52,14 @@ int CDKIMSign::Init( DKIMSignOptions* pOptions )
 
 	m_Canon = pOptions->nCanon;
 
+	// as of draft 01, these are the only allowed signing types:
+	if(     (m_Canon != DKIM_SIGN_SIMPLE_RELAXED) 
+		 && (m_Canon != DKIM_SIGN_RELAXED)
+		 && (m_Canon != DKIM_SIGN_RELAXED_SIMPLE) )
+	{
+		m_Canon = DKIM_SIGN_SIMPLE;
+	}
+
 	sSelector.assign( pOptions->szSelector );
 
 	m_pfnHdrCallback = pOptions->pfnHeaderCallback;
@@ -269,8 +277,13 @@ int CDKIMSign::ProcessHeaders(void)
 
 void CDKIMSign::ProcessHeader( const string& sHdr )
 {
-	switch( m_Canon )
+	switch( HIWORD( m_Canon ) )
 	{
+	case DKIM_CANON_SIMPLE:
+		Hash( sHdr.c_str(), sHdr.size() );
+		Hash( "\r\n", 2 );
+		break;
+
 	case DKIM_CANON_NOWSP:
 		{
 			string sTemp = sHdr;
@@ -287,18 +300,21 @@ void CDKIMSign::ProcessHeader( const string& sHdr )
 			Hash( "\r\n", 2 );
 		}
 		break;
-		
-	case DKIM_CANON_SIMPLE:
-		Hash( sHdr.c_str(), sHdr.size() );
-		Hash( "\r\n", 2 );
-		break;
+
+	case DKIM_CANON_RELAXED:
+		{
+			string sTemp = RelaxHeader( sHdr );
+			Hash( sTemp.c_str(), sTemp.length() );
+			Hash( "\r\n", 2 );
+		}
+		break;	
 	}
 }
 
 
 int CDKIMSign::ProcessBody( char* szBuffer, int nBufLength )
 {
-	switch( m_Canon )
+	switch( LOWORD( m_Canon ) )
 	{
 	case DKIM_CANON_SIMPLE:
 		if( nBufLength > 0 )
@@ -312,6 +328,14 @@ int CDKIMSign::ProcessBody( char* szBuffer, int nBufLength )
 		if( nBufLength > 0 )
 			Hash( szBuffer, nBufLength );
 		m_nBodyLength += nBufLength;
+		break;
+
+	case DKIM_CANON_RELAXED:
+		CompressSWSP( szBuffer, nBufLength );
+		if( nBufLength > 0 )
+			Hash( szBuffer, nBufLength );
+		Hash( "\r\n", 2 );
+		m_nBodyLength += nBufLength + 2;
 		break;
 	}
 
@@ -544,7 +568,21 @@ int CDKIMSign::GetSig( char* szPrivKey, char* szSignature, int nSigLength )
 
 	AddTagToSig( 'a', "rsa-sha1", 0 );
 
-	AddTagToSig( 'c', (m_Canon == DKIM_CANON_NOWSP) ? "nowsp" : "simple", 0 );
+	switch( m_Canon )
+	{
+	case DKIM_SIGN_SIMPLE:
+		AddTagToSig( 'c', "simple", 0 );
+		break;
+	case DKIM_SIGN_SIMPLE_RELAXED:
+		AddTagToSig( 'c', "simple/relaxed", 0 );
+		break;
+	case DKIM_SIGN_RELAXED:
+		AddTagToSig( 'c', "relaxed/relaxed", 0 );
+		break;
+	case DKIM_SIGN_RELAXED_SIMPLE:
+		AddTagToSig( 'c', "relaxed", 0 );
+		break;
+	}
 
 	AddTagToSig( 'd', sDomain, 0 );
 
@@ -586,15 +624,15 @@ int CDKIMSign::GetSig( char* szPrivKey, char* szSignature, int nSigLength )
 	// Force a full copy - no reference copies please
 	sSignedSig.assign( m_sSig.c_str() );
 
-	if( m_Canon == DKIM_CANON_NOWSP )
+	if( HIWORD(m_Canon) == DKIM_CANON_RELAXED )
 	{
-		RemoveSWSP( sSignedSig );
-		// convert "DKIM-Signature" to lower case
-		sSignedSig.replace( 0, 14, "dkim-signature", 14 );
+		string sTemp = RelaxHeader( sSignedSig );
+		Hash( sTemp.c_str(), sTemp.size() );
 	}
-
-	Hash( sSignedSig.c_str(), sSignedSig.size() );
-
+	else
+	{
+		Hash( sSignedSig.c_str(), sSignedSig.size() );
+	}
 
 //	fclose( fpdebug );
 //	fpdebug = NULL;

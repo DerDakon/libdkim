@@ -44,9 +44,14 @@ public:
 	int ReAlloc( char*& szBuffer, int& nBufferLength, int nRequiredSize );
 	void Free( char* szBuffer );
 
-	void RemoveSWSP( char* szBuffer );
-	void RemoveSWSP( char* pBuffer, int& nBufLength );
-	void RemoveSWSP( string& sBuffer );
+	static void RemoveSWSP( char* szBuffer );
+	static void RemoveSWSP( char* pBuffer, int& nBufLength );
+	static void RemoveSWSP( string& sBuffer );
+
+	static void CompressSWSP( char* pBuffer, int& nBufLength );
+	static void CompressSWSP( string& sBuffer );
+
+	static string RelaxHeader( const string& sHeader );
 
 	virtual int ProcessHeaders(void);
 	virtual int ProcessBody( char* szBuffer, int nBufLength );

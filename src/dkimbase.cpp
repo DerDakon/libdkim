@@ -271,3 +271,93 @@ void CDKIMBase::RemoveSWSP( string& sBuffer )
 {
 	sBuffer.erase( remove_if( sBuffer.begin(), sBuffer.end(), isswsp() ), sBuffer.end() );
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// 
+// CompressSWSP - compress streaming white space into single spaces from buffer/string inline
+//
+//////////////////////////////////////////////////////////////////////////////////////////
+
+void CDKIMBase::CompressSWSP( char* pBuffer, int& nBufLength )
+{
+	char* pSrc = pBuffer;
+	char* pDst = pBuffer;
+	char* pEnd = pBuffer+nBufLength;
+
+	while (pSrc != pEnd)
+	{
+		if (isswsp()(*pSrc))
+		{
+
+			do {
+				++pSrc;
+			} while (pSrc != pEnd && isswsp()(*pSrc));
+
+			if (pSrc == pEnd)
+				break;
+
+			*pDst++ = ' ';
+		}
+
+		*pDst++ = *pSrc++;
+	}
+
+	nBufLength = pDst - pBuffer;
+}
+
+void CDKIMBase::CompressSWSP( string& sBuffer )
+{
+	string::iterator iSrc = sBuffer.begin();
+	string::iterator iDst = sBuffer.begin();
+	string::iterator iEnd = sBuffer.end();
+
+	while (iSrc != iEnd)
+	{
+		if (isswsp()(*iSrc))
+		{
+
+			do {
+				++iSrc;
+			} while (iSrc != iEnd && isswsp()(*iSrc));
+
+			if (iSrc == iEnd)
+				break;
+
+			*iDst++ = ' ';
+		}
+
+		*iDst++ = *iSrc++;
+	}
+
+	sBuffer.erase(iDst, iEnd);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// 
+// RelaxHeader - relax a header field (lower case the name, remove swsp after :)
+//
+//////////////////////////////////////////////////////////////////////////////////////////
+
+string CDKIMBase::RelaxHeader( const string& sHeader )
+{
+	string sTemp = sHeader;
+
+	CompressSWSP(sTemp);
+
+	string::iterator iEnd = sTemp.end();
+	for (string::iterator i = sTemp.begin(); i != iEnd; ++i)
+	{
+		if (*i >= 'A' && *i <= 'Z')
+			*i += 'a'-'A';
+		else if (*i == ':')
+		{
+			if (i+1 != iEnd && isswsp()(*(i+1)))
+				sTemp.erase(i+1, i+2);
+			break;
+		}
+	}
+
+	return sTemp;
+}
+

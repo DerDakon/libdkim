@@ -440,7 +440,11 @@ int CDKIMVerify::GetResults(void)
 					sSignedSig.erase(bpos+2, epos-bpos-2);
 			}
 
-			if ( i->Canonicalization == DKIM_CANON_NOWSP )
+			if ( i->HeaderCanonicalization == DKIM_CANON_RELAXED )
+			{
+				sSignedSig = RelaxHeader( sSignedSig );
+			}
+			else if ( i->HeaderCanonicalization == DKIM_CANON_NOWSP )
 			{
 				RemoveSWSP( sSignedSig );
 				// convert "DKIM-Signature" to lower case
@@ -668,11 +672,16 @@ int CDKIMVerify::ProcessHeaders(void)
 				used.push_back(i);
 
 				// hash this header
-				if (sig.Canonicalization == DKIM_CANON_SIMPLE)
+				if (sig.HeaderCanonicalization == DKIM_CANON_SIMPLE)
 				{
 					sig.Hash( i->c_str(), i->length() );
 				}
-				else if (sig.Canonicalization == DKIM_CANON_NOWSP)
+				else if (sig.HeaderCanonicalization == DKIM_CANON_RELAXED)
+				{
+					string sTemp = RelaxHeader( *i );
+					sig.Hash( sTemp.c_str(), sTemp.length() );
+				}
+				else if (sig.HeaderCanonicalization == DKIM_CANON_NOWSP)
 				{
 					string sTemp = *i;
 					RemoveSWSP( sTemp );
@@ -783,12 +792,35 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	sig.Selector = values[5];
 
 	// canonicalization
-	if (values[6] == NULL || strcmp(values[6], "simple") == 0)
-		sig.Canonicalization = DKIM_CANON_SIMPLE;
+	if (values[6] == NULL)
+	{
+		sig.HeaderCanonicalization = sig.BodyCanonicalization = DKIM_CANON_SIMPLE;
+	}
 	else if (strcmp(values[6], "nowsp") == 0)
-		sig.Canonicalization = DKIM_CANON_NOWSP;
+	{
+		// for backwards compatibility
+		sig.HeaderCanonicalization = sig.BodyCanonicalization = DKIM_CANON_NOWSP;
+	}
 	else
-		return DKIM_BAD_SYNTAX;
+	{
+		char *slash = strchr(values[6], '/');
+		if (slash != NULL)
+			*slash = '\0';
+
+		if (strcmp(values[6], "simple") == 0)
+			sig.HeaderCanonicalization = DKIM_CANON_SIMPLE;
+		else if (strcmp(values[6], "relaxed") == 0)
+			sig.HeaderCanonicalization = DKIM_CANON_RELAXED;
+		else
+			return DKIM_BAD_SYNTAX;
+
+		if (slash == NULL || strcmp(slash+1, "simple") == 0)
+			sig.BodyCanonicalization = DKIM_CANON_SIMPLE;
+		else if (strcmp(slash+1, "relaxed") == 0)
+			sig.BodyCanonicalization = DKIM_CANON_RELAXED;
+		else
+			return DKIM_BAD_SYNTAX;
+	}
 
 	// identity
 	if (values[7] == NULL)
@@ -908,12 +940,18 @@ int CDKIMVerify::ProcessBody( char* szBuffer, int nBufLength )
 	{
 		if ( i->Status == DKIM_SUCCESS )
 		{
-			if ( i->Canonicalization == DKIM_CANON_SIMPLE )
+			if ( i->BodyCanonicalization == DKIM_CANON_SIMPLE )
 			{
 				i->Hash( szBuffer, nBufLength, true );
 				i->Hash( "\r\n", 2, true );
 			}
-			else if ( i->Canonicalization == DKIM_CANON_NOWSP )
+			else if ( i->BodyCanonicalization == DKIM_CANON_RELAXED )
+			{
+				CompressSWSP( szBuffer, nBufLength );
+				i->Hash( szBuffer, nBufLength, true );
+				i->Hash( "\r\n", 2, true);
+			}
+			else if ( i->BodyCanonicalization == DKIM_CANON_NOWSP )
 			{
 				RemoveSWSP( szBuffer, nBufLength );
 				i->Hash( szBuffer, nBufLength, true );

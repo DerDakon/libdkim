@@ -19,7 +19,7 @@ OPENSSL_LIB = ../MDaemon/OpenSSL
 OUTDIR	= Debug
 CFLAGS  = /MTd /W3 /GX /Zi /Od /I"$(OPENSSL_INC)" /D "WIN32" /D "DEBUG" /D "_WINDOWS" /c /Fo"$(OUTDIR)/"
 LFLAGS  = /debug
-LIBS    = LIBCMTD.LIB libeay32.lib ws2_32.lib Advapi32.lib
+LIBS    = LIBCMTD.LIB $(OPENSSL_LIB)/libeay32.lib ws2_32.lib Advapi32.lib
 !ELSE
 OUTDIR	= Release
 CFLAGS  = /MT /W3 /GX /O2 /I"$(OPENSSL_INC)" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /c /Fo"$(OUTDIR)/"

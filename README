@@ -2,6 +2,11 @@ Alt-N DKIM Open Source Project
 Copyright 2005 Alt-N Technologies, Ltd.
 
 
+-----------------------
+1.0.9 November 22, 2005
+-----------------------
+  o update to 01 draft
+
 -------------------
 1.0.8 July 28, 2005
 -------------------
@@ -25,8 +30,9 @@ Copyright 2005 Alt-N Technologies, Ltd.
 This library implements DKIM (DomainKeys Identified Mail).  The
 internet drafts are available here:
 
-http://www.ietf.org/internet-drafts/draft-allman-dkim-base-00.txt
-http://www.ietf.org/internet-drafts/draft-allman-dkim-ssp-00.txt
+http://www.ietf.org/internet-drafts/draft-allman-dkim-base-01.txt
+http://www.ietf.org/internet-drafts/draft-allman-dkim-ssp-01.txt
+http://www.ietf.org/internet-drafts/draft-fenton-dkim-threats-01.txt
 
 
 Build Instructions

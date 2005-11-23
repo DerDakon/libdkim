@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 
 	time(&t);
 
-	opts.nCanon = DKIM_CANON_NOWSP;
+	opts.nCanon = DKIM_SIGN_SIMPLE;
 	opts.nIncludeBodyLengthTag = 0;
 	opts.nIncludeQueryMethod = 0;
 	opts.nIncludeTimeStamp = 0;
@@ -83,13 +83,21 @@ int main(int argc, char* argv[])
 				break;
 
 			case 'c':		// canonicalization
-				if( argv[n][2] == 'n' )
+				if( argv[n][2] == 'r' )
 				{
-					opts.nCanon = DKIM_CANON_NOWSP;
+					opts.nCanon = DKIM_SIGN_RELAXED;
 				}
-				else
+				else if( argv[n][2] == 's' )
 				{
-					opts.nCanon = DKIM_CANON_NOWSP;
+					opts.nCanon = DKIM_SIGN_SIMPLE;
+				}
+				else if( argv[n][2] == 't' )
+				{
+					opts.nCanon = DKIM_SIGN_RELAXED_SIMPLE;
+				}
+				else if( argv[n][2] == 'u' )
+				{
+					opts.nCanon = DKIM_SIGN_SIMPLE_RELAXED;
 				}
 				break;
 
