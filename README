@@ -3,6 +3,13 @@ Copyright 2005 Alt-N Technologies, Ltd.
 
 
 -----------------------
+1.0.10 February 21, 2005
+-----------------------
+  o added sha-256 hashing capability. Can sign with either
+    sha-1, sha-256, or both. Either type can be verified.
+    This version requires OpenSSL 0.9.8a
+
+-----------------------
 1.0.9 November 22, 2005
 -----------------------
   o update to 01 draft
