@@ -3,7 +3,7 @@ Copyright 2005 Alt-N Technologies, Ltd.
 
 
 -----------------------
-1.0.10 February 21, 2005
+1.0.10 February 21, 2006
 -----------------------
   o added sha-256 hashing capability. Can sign with either
     sha-1, sha-256, or both. Either type can be verified.
