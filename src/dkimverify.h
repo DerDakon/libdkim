@@ -75,6 +75,7 @@ public:
 	SelectorInfo *m_pSelector;
 
 	int Status;
+	int m_nHash;						// use one of the DKIM_HASH_xxx constants here
 };
 
 class CDKIMVerify : public CDKIMBase

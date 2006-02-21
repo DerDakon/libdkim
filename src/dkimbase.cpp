@@ -148,19 +148,25 @@ int CDKIMBase::Process( char* szBuffer, int nBufLength )
 				// non-empty line found.  process any pending empty lines
 				while( m_EmptyLineCount > 0 )
 				{
+					int Result;
+
 					if( m_InHeaders )
 					{
 						m_InHeaders = false;
-						int Result = ProcessHeaders();
-						if (Result != DKIM_SUCCESS)
-							return Result;
+						Result = ProcessHeaders();
 					}
 					else
 					{
-						int Result = ProcessBody("", 0);
-						if (Result != DKIM_SUCCESS)
-							return Result;
+						Result = ProcessBody("", 0);
 					}
+
+					if (Result != DKIM_SUCCESS)
+					{
+						m_EmptyLineCount = 0;
+						m_LinePos = 0;
+						return Result;
+					}
+
 					m_EmptyLineCount--;
 				}
 
@@ -188,7 +194,10 @@ int CDKIMBase::Process( char* szBuffer, int nBufLength )
 				{
 					int Result = ProcessBody(m_Line, m_LinePos);
 					if (Result != DKIM_SUCCESS)
+					{
+						m_LinePos = 0;
 						return Result;
+					}
 				}
 
 				m_LinePos = 0;

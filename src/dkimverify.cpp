@@ -653,7 +653,7 @@ int CDKIMVerify::ProcessHeaders(void)
 			continue;
 
 		// initialize the hash
-		EVP_VerifyInit( &sig.m_mdctx, EVP_sha1() );
+		EVP_VerifyInit( &sig.m_mdctx, sig.m_nHash ? EVP_sha256() : EVP_sha1() );
 
 		// compute the hash of the header
 		vector<list<string>::reverse_iterator> used;
@@ -768,8 +768,18 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 		return DKIM_BAD_SYNTAX;
 
 	// the only algorithm we know is "rsa-sha1"
-	if (strcmp(values[1], "rsa-sha1") != 0)
+	if (strcmp(values[1], "rsa-sha1") == 0) 
+	{
+		sig.m_nHash = 0;
+	}
+	else if (strcmp(values[1], "rsa-sha256") == 0)
+	{
+		sig.m_nHash = 1;
+	}
+	else
+	{
 		return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for unknown algorithm
+	}
 
 	// make sure the signature data is not empty??
 	unsigned SigDataLen = DecodeBase64(values[2]);
@@ -1091,7 +1101,7 @@ int SelectorInfo::Parse( char* Buffer )
 	}
 	else
 	{
-		unsigned char *PublicKeyData = (unsigned char *)values[4];
+		const unsigned char *PublicKeyData = (unsigned char *)values[4];
 		EVP_PKEY *pkey = d2i_PUBKEY(NULL, &PublicKeyData, PublicKeyLen);
 
 		if (pkey == NULL)

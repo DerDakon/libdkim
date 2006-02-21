@@ -52,6 +52,8 @@ int main(int argc, char* argv[])
 	DKIMContext ctxt;
 	DKIMSignOptions opts;
 
+	opts.nHash = DKIM_HASH_SHA1_AND_256;
+
 	time(&t);
 
 	opts.nCanon = DKIM_SIGN_SIMPLE;
@@ -59,7 +61,7 @@ int main(int argc, char* argv[])
 	opts.nIncludeQueryMethod = 0;
 	opts.nIncludeTimeStamp = 0;
 	opts.expireTime = t + 604800;		// expires in 1 week
-	strcpy( opts.szSelector, "jon" );
+	strcpy( opts.szSelector, "MDaemon" );
 	strcpy( opts.szDomain, "bardenhagen.com" );
 	strcpy( opts.szIdentity, "dkimtest@bardenhagen.com" );
 	opts.pfnHeaderCallback = SignThisHeader;
@@ -138,6 +140,11 @@ int main(int argc, char* argv[])
 				{
 					opts.expireTime = t + atoi( argv[n] + 2  );
 				}
+				break;
+
+			case 'z':		// sign w/ sha1, sha256 or both 
+				opts.nHash = atoi( &argv[n][2] );
+				break;
 			}
 		}
 		else
@@ -261,10 +268,15 @@ int main(int argc, char* argv[])
 
 		n = DKIMVerifyGetDetails(&ctxt, &nSigCount, &pDetails, szPolicy );
 
-		if( pDetails->nResult >= 0 )
-			printf( "Success\n" );
-		else
-			printf( "Failure\n" );
+		for ( int i = 0; i < nSigCount; i++)
+		{
+			printf( "Signature #%d: ", i + 1 );
+
+			if( pDetails[i].nResult >= 0 )
+				printf( "Success\n" );
+			else
+				printf( "Failure\n" );
+		}
 
 		DKIMVerifyFree( &ctxt );
 	}

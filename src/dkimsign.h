@@ -51,9 +51,11 @@ protected:
 	void AddFoldedValueToSig( const string &sValue, char cbrk );
 
 	bool IsRequiredHeader( const string& sTag );
+	int ConstructSignature( char* szPrivKey, bool bUseSha256 );
 
-	EVP_MD_CTX m_mdctx;		/* the hash */
-	int m_Canon;			// canonization method
+	EVP_MD_CTX m_sha1ctx;		/* the hash for sha1  */
+	EVP_MD_CTX m_sha256ctx;		/* the hash for sha256 */
+	int m_Canon;				// canonization method
 
 	string hParam;
 	string sFrom;
@@ -66,8 +68,9 @@ protected:
 	bool m_IncludeBodyLengthTag;
 	int m_nBodyLength;
 	time_t m_ExpireTime;
-	int m_nIncludeTimeStamp;					// 0 = don't include t= tag, 1 = include t= tag
+	int m_nIncludeTimeStamp;				// 0 = don't include t= tag, 1 = include t= tag
 	int m_nIncludeQueryMethod;				// 0 = don't include q= tag, 1 = include q= tag
+	int m_nHash;							// use one of the DKIM_HASH_xx constants here
 
 
 	DKIMHEADERCALLBACK m_pfnHdrCallback;

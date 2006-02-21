@@ -26,9 +26,13 @@
 extern "C" {
 #endif
 
-#define DKIM_CANON_SIMPLE	1
-#define DKIM_CANON_NOWSP	2
-#define DKIM_CANON_RELAXED	3
+#define DKIM_HASH_SHA1			0
+#define DKIM_HASH_SHA256		1
+#define DKIM_HASH_SHA1_AND_256  2
+
+#define DKIM_CANON_SIMPLE		1
+#define DKIM_CANON_NOWSP		2
+#define DKIM_CANON_RELAXED		3
 
 #define DKIM_SIGN_SIMPLE			MAKELONG(DKIM_CANON_SIMPLE,DKIM_CANON_SIMPLE)
 #define DKIM_SIGN_SIMPLE_RELAXED	MAKELONG(DKIM_CANON_RELAXED,DKIM_CANON_SIMPLE)
@@ -98,6 +102,7 @@ typedef struct DKIMSignOptions_t
 	unsigned long expireTime;				// for x= tag, if 0 tag will not be included in sig
 	DKIMHEADERCALLBACK pfnHeaderCallback;	// header callback
 	char szRequiredHeaders[256];			// colon-separated list of headers that must be signed
+	int nHash;								// use one of the DKIM_HASH_xx constants here
 } DKIMSignOptions;							// even if not present in the message
 
 typedef struct DKIMVerifyOptions_t
