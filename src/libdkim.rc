@@ -75,7 +75,7 @@ BEGIN
             VALUE "FileDescription", "DKIM Library\0"
             VALUE "FileVersion", VERSION_STRING "\0"
             VALUE "InternalName", "LIBDKIM\0"
-            VALUE "LegalCopyright", "Copyright © 1996-2005 Alt-N Technologies, Ltd.\0"
+            VALUE "LegalCopyright", "Copyright © 1996-2006 Alt-N Technologies, Ltd.\0"
             VALUE "LegalTrademarks", "\0"
             VALUE "OriginalFilename", "LibDKIM.dll\0"
             VALUE "PrivateBuild", "\0"

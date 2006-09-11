@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
 	char PrivKey[2048];
 	char Buffer[1024];
 	int BufLen;
-	char szSignature[2048];
+	char szSignature[10024];
 	time_t t;
 	DKIMContext ctxt;
 	DKIMSignOptions opts;
@@ -56,8 +56,8 @@ int main(int argc, char* argv[])
 
 	time(&t);
 
-	opts.nCanon = DKIM_SIGN_SIMPLE;
-	opts.nIncludeBodyLengthTag = 0;
+	opts.nCanon = DKIM_SIGN_RELAXED;
+	opts.nIncludeBodyLengthTag = 1;
 	opts.nIncludeQueryMethod = 0;
 	opts.nIncludeTimeStamp = 0;
 	opts.expireTime = t + 604800;		// expires in 1 week
@@ -66,6 +66,8 @@ int main(int argc, char* argv[])
 	strcpy( opts.szIdentity, "dkimtest@bardenhagen.com" );
 	opts.pfnHeaderCallback = SignThisHeader;
 	strcpy( opts.szRequiredHeaders, "NonExistant" );
+	opts.nIncludeCopiedHeaders = 0;
+	opts.nIncludeBodyHash = 1;
 
 	int nArgParseState = 0;
 	bool bSign = true;
@@ -76,12 +78,8 @@ int main(int argc, char* argv[])
 		{
 			switch( argv[n][1] )
 			{
-			case 'v':		// verify
-				bSign = false;
-				break;
-
-			case 's':		// sign
-				bSign = true;
+			case 'b':		// allman or ietf draft 1 or both
+				opts.nIncludeBodyHash = atoi( &argv[n][2] );
 				break;
 
 			case 'c':		// canonicalization
@@ -108,13 +106,10 @@ int main(int argc, char* argv[])
 				opts.nIncludeBodyLengthTag = 1;
 				break;
 
-			case 'q':		// query method tag
-				opts.nIncludeQueryMethod = 1;
-				break;
 
-			case 't':		// timestamp tag
-				opts.nIncludeTimeStamp = 1;
-				break;
+			case 'h':
+				printf( "usage: \n" );
+				return 0;
 
 			case 'i':		// identity 
 				if( argv[n][2] == '-' )
@@ -127,9 +122,21 @@ int main(int argc, char* argv[])
 				}
 				break;
 
-			case 'h':
-				printf( "usage: \n" );
-				return 0;
+			case 'q':		// query method tag
+				opts.nIncludeQueryMethod = 1;
+				break;
+
+			case 's':		// sign
+				bSign = true;
+				break;
+
+			case 't':		// timestamp tag
+				opts.nIncludeTimeStamp = 1;
+				break;
+
+			case 'v':		// verify
+				bSign = false;
+				break;
 
 			case 'x':		// expire time 
 				if( argv[n][2] == '-' )
@@ -141,6 +148,7 @@ int main(int argc, char* argv[])
 					opts.expireTime = t + atoi( argv[n] + 2  );
 				}
 				break;
+
 
 			case 'z':		// sign w/ sha1, sha256 or both 
 				opts.nHash = atoi( &argv[n][2] );
@@ -210,7 +218,13 @@ int main(int argc, char* argv[])
 
 		fclose( MsgFP );
 		
-		n = DKIMSignGetSig( &ctxt, PrivKey, szSignature, sizeof(szSignature) );
+		//n = DKIMSignGetSig( &ctxt, PrivKey, szSignature, sizeof(szSignature) );
+
+		char* pSig = NULL;
+
+		n = DKIMSignGetSig2( &ctxt, PrivKey, &pSig );
+
+		strcpy( szSignature, pSig );
 
 		DKIMSignFree( &ctxt );
 

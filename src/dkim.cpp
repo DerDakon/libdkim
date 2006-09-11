@@ -118,6 +118,20 @@ int DKIM_CALL DKIMSignGetSig( DKIMContext* pSignContext, char* szPrivKey, char* 
 	return DKIM_INVALID_CONTEXT;
 }
 
+int DKIM_CALL DKIMSignGetSig2( DKIMContext* pSignContext, char* szPrivKey, char** pszSignature )
+{
+	CDKIMSign* pSign = (CDKIMSign*)ValidateContext( pSignContext, true );
+
+	if( pSign )
+	{
+		return pSign->GetSig2( szPrivKey, pszSignature );
+	}
+	
+	return DKIM_INVALID_CONTEXT;
+
+}
+
+
 
 void DKIM_CALL DKIMSignFree( DKIMContext* pSignContext )
 {
@@ -228,7 +242,12 @@ static char* DKIMErrorStrings[-1-DKIM_MAX_ERROR] = {
 	"DKIM_SELECTOR_PUBLIC_KEY_INVALID",
 	"DKIM_NO_SIGNATURES",
 	"DKIM_NO_VALID_SIGNATURES",
+	"DKIM_BODY_HASH_MISMATCH",
+	"DKIM_SELECTOR_ALGORITHM_MISMATCH",
+	"DKIM_STAT_INCOMPAT"
+
 };
+
 
 char* DKIM_CALL DKIMGetErrorString( int ErrorCode )
 {

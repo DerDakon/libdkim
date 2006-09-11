@@ -30,19 +30,23 @@
 #include <vector>
 #include <algorithm>
 
+#define MAX_SIGNATURES	10			// maximum number of DKIM signatures to process in a message
+
 
 SignatureInfo::SignatureInfo()
 {
 	VerifiedBodyCount = 0;
 	UnverifiedBodyCount = 0;
-	EVP_MD_CTX_init( &m_mdctx );
+	EVP_MD_CTX_init( &m_Hdr_ctx );
+	EVP_MD_CTX_init( &m_Bdy_ctx );
 	m_pSelector = NULL;
 	Status = DKIM_SUCCESS;
 }
 
 SignatureInfo::~SignatureInfo()
 {
-	EVP_MD_CTX_cleanup( &m_mdctx );
+	EVP_MD_CTX_cleanup( &m_Hdr_ctx );
+	EVP_MD_CTX_cleanup( &m_Bdy_ctx );
 }
 
 
@@ -56,7 +60,7 @@ inline bool isswsp(char ch)
 // Parse a DKIM tag-list.  Returns true for success
 //
 ////////////////////////////////////////////////////////////////////////////////
-bool ParseTagValueList(char *tagvaluelist, const char *letters, char *values[])
+bool ParseTagValueList(char *tagvaluelist, const char *wanted[], char *values[])
 {
 	char *s = tagvaluelist;
 
@@ -123,19 +127,16 @@ bool ParseTagValueList(char *tagvaluelist, const char *letters, char *values[])
 		// null-terminate tag value
 		*e = '\0';
 
-		// we only care about 1-character tags right now...
-		if (tag[1] == '\0')
+		// check to see if we want this tag
+		for (unsigned i=0; wanted[i] != NULL; i++)
 		{
-			for (unsigned i=0; letters[i] != '\0'; i++)
+			if (strcmp(wanted[i], tag) == 0)
 			{
-				if (letters[i] == tag[0])
-				{
-					// return failure if we already have a value for this tag (duplicates not allowed)
-					if (values[i] != NULL)
-						return false;
-					values[i] = value;
-					break;
-				}
+				// return failure if we already have a value for this tag (duplicates not allowed)
+				if (values[i] != NULL)
+					return false;
+				values[i] = value;
+				break;
 			}
 		}
 
@@ -376,6 +377,7 @@ CDKIMVerify::CDKIMVerify()
 	m_pfnSelectorCallback = NULL;
 	m_pfnPolicyCallback = NULL;
 	m_HonorBodyLengthTag = false;
+	m_CheckPolicy = false;
 }
 
 CDKIMVerify::~CDKIMVerify()
@@ -402,6 +404,7 @@ int CDKIMVerify::Init( DKIMVerifyOptions* pOptions )
 #endif
 
 	m_HonorBodyLengthTag = pOptions->nHonorBodyLengthTag != 0;
+	m_CheckPolicy = pOptions->nCheckPolicy != 0;
 
 	return nRet;
 }
@@ -425,12 +428,59 @@ int CDKIMVerify::GetResults(void)
 	{
 		if (i->Status == DKIM_SUCCESS)
 		{
-			// hash CRLF separating the body from the signature
-			i->Hash( "\r\n", 2 );
 
+			if (!i->BodyHashData.empty())
+			{
+				// check the body hash
+				unsigned char md[EVP_MAX_MD_SIZE];
+				unsigned len = 0;
+
+				int res = EVP_DigestFinal( &i->m_Bdy_ctx, md, &len);
+
+				if (!res || len != i->BodyHashData.length() || memcmp(i->BodyHashData.data(), md, len) != 0)
+				{
+					// body hash mismatch
+
+					// if the selector is in testing mode...
+					if (i->m_pSelector->Testing)
+					{
+						i->Status = DKIM_SIGNATURE_BAD_BUT_TESTING;	// todo: make a new error code for this?
+						TestingFailures++;
+					}
+					else
+					{
+						i->Status = DKIM_BODY_HASH_MISMATCH;
+						RealFailures++;
+					}
+
+					continue;
+				}
+			}
+			else
+			{
+				// hash CRLF separating the body from the signature
+				i->Hash( "\r\n", 2 );
+			}
+
+
+			// check the header hash
 			string sSignedSig = i->Header;
 
-			unsigned bpos = sSignedSig.find("b=", 0, 2);
+			unsigned bpos = sSignedSig.find("b=", 15, 2);	// 15 is the length of "DKIM-Signature:"
+			if (bpos != -1)
+			{
+				// skip backwards over whitespace and look for a ';'
+				// if not found, we're in some other tag's value so keep looking
+				do  {
+					unsigned pos = bpos;
+					while (pos > 15 && isswsp(sSignedSig[pos-1]))
+						pos--;
+					if (pos == 15 || sSignedSig[pos-1] == ';')
+						break;
+					bpos = sSignedSig.find("b=", bpos+2, 2);
+				} while (bpos != -1);
+			}
+
 			if (bpos != -1)
 			{
 				unsigned epos = sSignedSig.find(';', bpos+2);
@@ -455,7 +505,7 @@ int CDKIMVerify::GetResults(void)
 
 			assert( i->m_pSelector != NULL );
 
-			int res = EVP_VerifyFinal( &i->m_mdctx, (unsigned char *) i->Data.data(), i->Data.length(), i->m_pSelector->PublicKey);
+			int res = EVP_VerifyFinal( &i->m_Hdr_ctx, (unsigned char *) i->SignatureData.data(), i->SignatureData.length(), i->m_pSelector->PublicKey);
 
 			if (res == 1)
 			{
@@ -528,11 +578,11 @@ int CDKIMVerify::GetResults(void)
 
 	// get the policy
 	int iPolicy = DKIM_POLICY_SIGNS_SOME;
-	bool bPolicyTesting = false;
+	bool bPolicyIsTesting = false;
 
-	if (!sFromDomain.empty())
+	if (m_CheckPolicy && !sFromDomain.empty())
 	{
-		int PolicyStatus = GetPolicy(sFromDomain, iPolicy, bPolicyTesting);
+		int PolicyStatus = GetPolicy(sFromDomain, iPolicy, bPolicyIsTesting);
 		if (PolicyStatus != DKIM_SUCCESS)
 		{
 			// could not get policy, leave values at the defaults
@@ -546,7 +596,7 @@ int CDKIMVerify::GetResults(void)
 	}
 
 	// if any selectors were testing or the policy is testing return neutral
-	if (TestingFailures >0 || bPolicyTesting)
+	if (TestingFailures >0 || bPolicyIsTesting)
 		return DKIM_NEUTRAL;
 
 	// if the message should be signed, return fail
@@ -601,7 +651,14 @@ void SignatureInfo::Hash( const char* szBuffer, unsigned nBufLength, bool IsBody
 		}
 	}
 
-	EVP_VerifyUpdate( &m_mdctx, szBuffer, nBufLength );
+	if (IsBody && !BodyHashData.empty())
+	{
+		EVP_DigestUpdate( &m_Bdy_ctx, szBuffer, nBufLength );
+	}
+	else
+	{
+		EVP_VerifyUpdate( &m_Hdr_ctx, szBuffer, nBufLength );
+	}
 }
 
 
@@ -615,7 +672,7 @@ int CDKIMVerify::ProcessHeaders(void)
 	// look for DKIM-Signature header(s)
 	for( list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i )
 	{
-		if( strnicmp(i->c_str(), "DKIM-Signature:", 15 ) == 0 )
+		if( strnicmp(i->c_str(), "DKIM-Signature:", 15 ) == 0 && Signatures.size() < MAX_SIGNATURES )
 		{
 			SignatureInfo sig;
 			sig.Status = ParseDKIMSignature( *i, sig );
@@ -647,13 +704,30 @@ int CDKIMVerify::ProcessHeaders(void)
 			// check the granularity
 			if (!WildcardMatch(sel.Granularity.c_str(), sig.IdentityLocalPart.c_str()))
 				sig.Status = DKIM_SELECTOR_GRANULARITY_MISMATCH;		// this error causes the signature to fail
+
+			// check the hash algorithm
+			if ( (sig.m_nHash == DKIM_HASH_SHA1 && !sel.AllowSHA1) || (sig.m_nHash == DKIM_HASH_SHA256 && !sel.AllowSHA256) )
+				sig.Status = DKIM_SELECTOR_ALGORITHM_MISMATCH;			// causes signature to be ignored
+
+			// check for same domain
+			if (sel.SameDomain && stricmp(sig.Domain.c_str(), sig.IdentityDomain.c_str()) != 0)
+				sig.Status = DKIM_BAD_SYNTAX;
 		}
 
-		if ( sig.Status != DKIM_SUCCESS)
+		if (sig.Status != DKIM_SUCCESS)
 			continue;
 
-		// initialize the hash
-		EVP_VerifyInit( &sig.m_mdctx, sig.m_nHash ? EVP_sha256() : EVP_sha1() );
+		// initialize the hashes
+		if (sig.m_nHash == DKIM_HASH_SHA256)
+		{
+			EVP_VerifyInit( &sig.m_Hdr_ctx, EVP_sha256() );
+			EVP_DigestInit( &sig.m_Bdy_ctx, EVP_sha256() );
+		}
+		else
+		{
+			EVP_VerifyInit( &sig.m_Hdr_ctx, EVP_sha1() );
+			EVP_DigestInit( &sig.m_Bdy_ctx, EVP_sha1() );
+		}
 
 		// compute the hash of the header
 		vector<list<string>::reverse_iterator> used;
@@ -699,7 +773,11 @@ int CDKIMVerify::ProcessHeaders(void)
 			}
 		}
 
-		sig.Hash( "\r\n", 2 );
+		if (sig.BodyHashData.empty())
+		{
+			// hash CRLF separating headers from body
+			sig.Hash( "\r\n", 2 );
+		}
 
 		ValidSigFound = true;
 	}
@@ -753,39 +831,77 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	// extract value (15 is the length of "DKIM-Signature:")
 	string sValue = sHeader.substr(15);
 
-	static const char letters[] = "vabdhscilqtx";
-	char *values[sizeof(letters)] = {NULL};
+	static const char *tags[] = {"v","a","b","d","h","s","c","i","l","q","t","x","bh",NULL};
+	char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
 
-	if (!ParseTagValueList( (char*) sValue.c_str(), letters, values))
+	if (!ParseTagValueList( (char*) sValue.c_str(), tags, values))
 		return DKIM_BAD_SYNTAX;
 
-	// signature MUST NOT have v=
+	// check signature version
 	if (values[0] != NULL)
-		return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for signature having v=
+	{
+		if (strcmp(values[0], "0.2") == 0 || strcmp(values[0], "0.3") == 0 || strcmp(values[0], "0.4") == 0)
+		{
+			sig.Version = DKIM_SIG_VERSION_02_PLUS;
+		}
+		else
+		{
+			// unknown version
+			return DKIM_STAT_INCOMPAT;
+		}
+	}
+	else
+	{
+		// prior to 0.2, there MUST NOT have been a v=
+		// (optionally) support these signatures, for backwards compatibility
+		if (true)
+		{
+			sig.Version = DKIM_SIG_VERSION_PRE_02;
+		}
+		else
+		{
+			return DKIM_STAT_INCOMPAT;
+		}
+	}
 
 	// signature MUST have a=, b=, d=, h=, s=
 	if (values[1] == NULL || values[2] == NULL || values[3] == NULL || values[4] == NULL || values[5] == NULL)
 		return DKIM_BAD_SYNTAX;
 
-	// the only algorithm we know is "rsa-sha1"
+	// algorithm can be "rsa-sha1" or "rsa-sha256"
 	if (strcmp(values[1], "rsa-sha1") == 0) 
 	{
-		sig.m_nHash = 0;
+		sig.m_nHash = DKIM_HASH_SHA1;
 	}
 	else if (strcmp(values[1], "rsa-sha256") == 0)
 	{
-		sig.m_nHash = 1;
+		sig.m_nHash = DKIM_HASH_SHA256;
 	}
 	else
 	{
 		return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for unknown algorithm
 	}
 
-	// make sure the signature data is not empty??
+	// make sure the signature data is not empty
 	unsigned SigDataLen = DecodeBase64(values[2]);
 	if (SigDataLen == 0)
 		return DKIM_BAD_SYNTAX;
-	sig.Data.assign(values[2], SigDataLen);
+	sig.SignatureData.assign(values[2], SigDataLen);
+
+	// check for body hash
+	if (values[12] == NULL)
+	{
+		// use the old single hash way for backwards compatibility
+		if (sig.Version != DKIM_SIG_VERSION_PRE_02)
+			return DKIM_BAD_SYNTAX;
+	}
+	else
+	{
+		unsigned BodyHashLen = DecodeBase64(values[12]);
+		if (BodyHashLen == 0)
+			return DKIM_BAD_SYNTAX;
+		sig.BodyHashData.assign(values[12], BodyHashLen);
+	}
 
 	// domain must not be empty
 	if (*values[3] == '\0')
@@ -806,7 +922,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	{
 		sig.HeaderCanonicalization = sig.BodyCanonicalization = DKIM_CANON_SIMPLE;
 	}
-	else if (strcmp(values[6], "nowsp") == 0)
+	else if (sig.Version == DKIM_SIG_VERSION_PRE_02 && strcmp(values[6], "nowsp") == 0)
 	{
 		// for backwards compatibility
 		sig.HeaderCanonicalization = sig.BodyCanonicalization = DKIM_CANON_NOWSP;
@@ -910,6 +1026,9 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 
 		if (sig.ExpireTime != -1)
 		{
+			// todo: compare the expire time to the t= value
+			// the value of x= MUST be greater than the value of t= if both are present
+			// todo: if possible, use the received date/time instead of the current time
 			unsigned curtime = time(NULL);
 			if (curtime > sig.ExpireTime)
 				return DKIM_SIGNATURE_EXPIRED;
@@ -981,8 +1100,11 @@ int CDKIMVerify::ProcessBody( char* szBuffer, int nBufLength )
 
 SelectorInfo::SelectorInfo(const string &sSelector, const string &sDomain) : Selector(sSelector), Domain(sDomain)
 {
+	AllowSHA1 = true;
+	AllowSHA256 = true;
 	PublicKey = NULL;
 	Testing = false;
+	SameDomain = false;
 	Status = DKIM_SUCCESS;
 }
 
@@ -1001,10 +1123,10 @@ SelectorInfo::~SelectorInfo()
 ////////////////////////////////////////////////////////////////////////////////
 int SelectorInfo::Parse( char* Buffer )
 {
-	static const char letters[] = "vghkpstn";
-	char *values[sizeof(letters)] = {NULL};
+	static const char *tags[] = {"v","g","h","k","p","s","t","n",NULL};
+	char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
 
-	if (!ParseTagValueList(Buffer, letters, values))
+	if (!ParseTagValueList(Buffer, tags, values))
 		return DKIM_SELECTOR_INVALID;
 
 	if (values[0] != NULL)
@@ -1034,20 +1156,24 @@ int SelectorInfo::Parse( char* Buffer )
 		Granularity = values[1];
 
 	// hash algorithm
-	if (values[2] != NULL)
+	if (values[2] == NULL)
 	{
-		// MUST include "sha1" (we only support sha1)
-		bool FoundSHA1 = false;
+		AllowSHA1 = true;
+		AllowSHA256 = true;
+	}
+	else
+	{
+		// MUST include "sha1" or "sha256"
 		char *s = strtok(values[2], ":");
 		while (s != NULL)
 		{
 			if (strcmp(s, "sha1") == 0)
-			{
-				FoundSHA1 = true;
-			}
+				AllowSHA1 = true;
+			else if (strcmp(s, "sha256") == 0)
+				AllowSHA256 = true;
 			s = strtok(NULL, ":");
 		}
-		if (!FoundSHA1)
+		if ( !(AllowSHA1 || AllowSHA256) )
 			return DKIM_SELECTOR_INVALID;	// todo: maybe create a new error code for unsupported hash algorithm
 	}
 
@@ -1087,6 +1213,10 @@ int SelectorInfo::Parse( char* Buffer )
 			if (strcmp(s, "y") == 0)
 			{
 				Testing = true;
+			}
+			else if (strcmp(s, "s") == 0)
+			{
+				SameDomain = true;
 			}
 			s = strtok(NULL, ":");
 		}
@@ -1206,10 +1336,10 @@ int CDKIMVerify::GetPolicy( const string &sDomain, int &iPolicy, bool &bTesting)
 		{
 			Policy = Buffer;
 
-			static const char letters[] = "otnru";
-			char *values[sizeof(letters)] = {NULL};
+			static const char *tags[] = {"o","t","n","r","u",NULL};
+			char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
 
-			if (!ParseTagValueList(Buffer, letters, values))
+			if (!ParseTagValueList(Buffer, tags, values))
 				return DKIM_POLICY_INVALID;
 
 			if (values[0] == NULL || values[0][0] == '\0' || values[0][1] != '\0')

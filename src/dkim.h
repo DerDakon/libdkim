@@ -26,10 +26,17 @@
 extern "C" {
 #endif
 
-#define DKIM_HASH_SHA1			0
-#define DKIM_HASH_SHA256		1
-#define DKIM_HASH_SHA1_AND_256  2
+// DKIM Body hash versions
+#define DKIM_BODYHASH_ALLMAN_1	1
+#define DKIM_BODYHASH_IETF_1	2
+#define DKIM_BODYHASH_BOTH		DKIM_BODYHASH_ALLMAN_1 | DKIM_BODYHASH_IETF_1
 
+// DKIM hash algorithms
+#define DKIM_HASH_SHA1			1
+#define DKIM_HASH_SHA256		2
+#define DKIM_HASH_SHA1_AND_256  DKIM_HASH_SHA1 | DKIM_HASH_SHA256
+
+// DKIM canonicalization methods
 #define DKIM_CANON_SIMPLE		1
 #define DKIM_CANON_NOWSP		2
 #define DKIM_CANON_RELAXED		3
@@ -38,7 +45,6 @@ extern "C" {
 #define DKIM_SIGN_SIMPLE_RELAXED	MAKELONG(DKIM_CANON_RELAXED,DKIM_CANON_SIMPLE)
 #define DKIM_SIGN_RELAXED			MAKELONG(DKIM_CANON_RELAXED,DKIM_CANON_RELAXED)
 #define DKIM_SIGN_RELAXED_SIMPLE	MAKELONG(DKIM_CANON_SIMPLE,DKIM_CANON_RELAXED)
-
 
 // DKIM Error codes
 #define DKIM_SUCCESS			0	// operation successful
@@ -63,7 +69,10 @@ extern "C" {
 #define DKIM_SELECTOR_PUBLIC_KEY_INVALID	-12		// signature error: selector p= value invalid or wrong format
 #define DKIM_NO_SIGNATURES					-13		// process error, no sigs
 #define DKIM_NO_VALID_SIGNATURES			-14		// process error, no valid sigs
-#define DKIM_MAX_ERROR						-15		// set this to 1 greater than the highest error code (but negative)
+#define DKIM_BODY_HASH_MISMATCH				-15		// sigature verify error: message body does not hash to bh value
+#define DKIM_SELECTOR_ALGORITHM_MISMATCH	-16		// signature error: selector h= doesn't match signature a=
+#define DKIM_STAT_INCOMPAT					-17		// signature error: incompatible v=
+#define DKIM_MAX_ERROR						-18		// set this to 1 greater than the highest error code (but negative)
 
 // DKIM_SUCCESS									// verify result: all signatures verified
 												// signature result: signature verified
@@ -71,6 +80,8 @@ extern "C" {
 #define DKIM_PARTIAL_SUCCESS				2	// verify result: at least one but not all signatures verified
 #define DKIM_NEUTRAL  						3	// verify result: message passed because of policy rather than signing
 #define DKIM_SUCCESS_BUT_EXTRA				4	// signature result: signature verified but it did not include all of the body
+
+
 
 // This function is called once for each header in the message
 // return 1 to include this header in the signature and 0 to exclude.
@@ -103,13 +114,17 @@ typedef struct DKIMSignOptions_t
 	DKIMHEADERCALLBACK pfnHeaderCallback;	// header callback
 	char szRequiredHeaders[256];			// colon-separated list of headers that must be signed
 	int nHash;								// use one of the DKIM_HASH_xx constants here
-} DKIMSignOptions;							// even if not present in the message
+											// even if not present in the message
+	int nIncludeCopiedHeaders;				// 0 = don't include z= tag, 1 = include z= tag
+	int nIncludeBodyHash;					// use one of the DKIM_BODYHASH_xx constants here
+} DKIMSignOptions;							
 
 typedef struct DKIMVerifyOptions_t
 {
 	DKIMDNSCALLBACK pfnSelectorCallback;	// selector record callback
 	DKIMDNSCALLBACK pfnPolicyCallback;		// policy record callback
 	int nHonorBodyLengthTag;				// 0 = ignore l= tag, 1 = use l= tag to limit the amount of body verified
+	int nCheckPolicy;						// 0 = use default (signs some) policy, 1 = request and use sender's policy
 } DKIMVerifyOptions;
 
 typedef struct DKIMVerifyDetails_t
@@ -127,6 +142,7 @@ typedef struct DKIMVerifyDetails_t
 int DKIM_CALL DKIMSignInit( DKIMContext* pSignContext, DKIMSignOptions* pOptions );
 int DKIM_CALL DKIMSignProcess( DKIMContext* pSignContext, char* szBuffer, int nBufLength );
 int DKIM_CALL DKIMSignGetSig( DKIMContext* pSignContext, char* szPrivKey, char* szSignature, int nSigLength );
+int DKIM_CALL DKIMSignGetSig2( DKIMContext* pSignContext, char* szPrivKey, char** pszSignature );
 void DKIM_CALL DKIMSignFree( DKIMContext* pSignContext );
 
 int DKIM_CALL DKIMVerifyInit( DKIMContext* pVerifyContext, DKIMVerifyOptions* pOptions );

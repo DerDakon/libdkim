@@ -29,6 +29,7 @@ public:
 	int Init( DKIMSignOptions* pOptions );
 
 	int GetSig( char* szPrivKey, char* szSignature, int nSigLength );
+	int GetSig2( char* szPrivKey, char** pszSignature );
 
 	virtual int ProcessHeaders(void);
 	virtual int ProcessBody( char* szBuffer, int nBufLength );
@@ -37,7 +38,7 @@ public:
 
 protected:
 
-	void Hash( const char* szBuffer, int nBufLength );
+	void Hash( const char* szBuffer, int nBufLength, bool bHdr, bool bAllmanOnly = false );
 
 	bool SignThisTag( const string& sTag );
 	void GetHeaderParams( const string& sHdr );
@@ -45,16 +46,24 @@ protected:
 	bool ParseFromAddress( void );
 
 	void InitSig(void);
-	void AddTagToSig( char cTag, const string &sValue, char cbrk );
-	void AddTagToSig( char cTag, unsigned long nValue );
+	void AddTagToSig( char* Tag, const string &sValue, char cbrk, bool bFold );
+	void AddTagToSig( char* Tag, unsigned long nValue );
 	void AddInterTagSpace( int nSizeOfNextTag );
 	void AddFoldedValueToSig( const string &sValue, char cbrk );
 
 	bool IsRequiredHeader( const string& sTag );
-	int ConstructSignature( char* szPrivKey, bool bUseSha256 );
+	int ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool bUseSha256 );
 
-	EVP_MD_CTX m_sha1ctx;		/* the hash for sha1  */
-	EVP_MD_CTX m_sha256ctx;		/* the hash for sha256 */
+	int AssembleReturnedSig( char* szPrivKey );
+
+	EVP_MD_CTX m_Hdr_ietf_sha1ctx;		/* the header hash for ietf sha1  */
+	EVP_MD_CTX m_Hdr_ietf_sha256ctx;	/* the header hash for ietf sha256 */
+
+	EVP_MD_CTX m_Bdy_ietf_sha1ctx;		/* the body hash for ietf sha1  */
+	EVP_MD_CTX m_Bdy_ietf_sha256ctx;	/* the body hash for ietf sha256 */
+
+	EVP_MD_CTX m_allman_sha1ctx;		/* the hash for allman sha1  */
+
 	int m_Canon;				// canonization method
 
 	string hParam;
@@ -71,12 +80,20 @@ protected:
 	int m_nIncludeTimeStamp;				// 0 = don't include t= tag, 1 = include t= tag
 	int m_nIncludeQueryMethod;				// 0 = don't include q= tag, 1 = include q= tag
 	int m_nHash;							// use one of the DKIM_HASH_xx constants here
+	int m_nIncludeCopiedHeaders;			// 0 = don't include z= tag, 1 = include z= tag
+	int m_nIncludeBodyHash;					// 0 = calculate sig using draft 0, 1 = include bh= tag and 
+											// use new signature computation algorithm
 
 
 	DKIMHEADERCALLBACK m_pfnHdrCallback;
 
 	string m_sSig;
 	int m_nSigPos;
+
+	string m_sReturnedSig;
+	bool m_bReturnedSigAssembled;
+
+	string m_sCopiedHeaders;
 
 };
 

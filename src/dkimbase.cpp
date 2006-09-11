@@ -344,7 +344,9 @@ void CDKIMBase::CompressSWSP( string& sBuffer )
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // 
-// RelaxHeader - relax a header field (lower case the name, remove swsp after :)
+// RelaxHeader - relax a header field (lower case the name, remove swsp before and after :)
+//
+// modified 4/21/06 STB to remove white space before colon
 //
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -354,17 +356,30 @@ string CDKIMBase::RelaxHeader( const string& sHeader )
 
 	CompressSWSP(sTemp);
 
-	string::iterator iEnd = sTemp.end();
-	for (string::iterator i = sTemp.begin(); i != iEnd; ++i)
+	unsigned cpos = sTemp.find(':');
+
+	if (cpos == -1)
 	{
-		if (*i >= 'A' && *i <= 'Z')
-			*i += 'a'-'A';
-		else if (*i == ':')
+		// no colon?!
+	}
+	else
+	{
+		// lower case the header field name
+		for (unsigned i=0; i<cpos; i++)
 		{
-			if (i+1 != iEnd && isswsp()(*(i+1)))
-				sTemp.erase(i+1, i+2);
-			break;
+			if (sTemp[i] >= 'A' && sTemp[i] <= 'Z')
+			{
+				sTemp[i] += 'a'-'A';
+			}
 		}
+
+		// remove the space after the :
+		if (sTemp.length() > cpos && isswsp()(sTemp[cpos+1]))
+			sTemp.erase(cpos+1, 1);
+
+		// remove the space before the :
+		if (cpos > 0 && isswsp()(sTemp[cpos-1]))
+			sTemp.erase(cpos-1, 1);
 	}
 
 	return sTemp;

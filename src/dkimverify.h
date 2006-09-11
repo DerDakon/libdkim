@@ -31,6 +31,10 @@
 #define DKIM_POLICY_DNS_PERM_FAILURE		-52		// internal error
 #define DKIM_POLICY_INVALID					-53		// internal error
 
+#define DKIM_SIG_VERSION_PRE_02			0
+#define DKIM_SIG_VERSION_02_PLUS		1
+
+
 class SelectorInfo
 {
 public:
@@ -40,8 +44,11 @@ public:
 	string Domain;
 	string Selector;
 	string Granularity;
+	bool AllowSHA1;
+	bool AllowSHA256;
 	EVP_PKEY *PublicKey;	/* the public key */
 	bool Testing;
+	bool SameDomain;
 
 	int Status;
 
@@ -57,9 +64,11 @@ public:
 	void Hash( const char* szBuffer, unsigned nBufLength, bool IsBody=false );
 
 	string Header;
+	unsigned Version;
 	string Domain;
 	string Selector;
-	string Data;
+	string SignatureData;
+	string BodyHashData;
 	string IdentityLocalPart;
 	string IdentityDomain;
 	vector<string> SignedHeaders;
@@ -71,7 +80,8 @@ public:
 	unsigned VerifiedBodyCount;
 	unsigned UnverifiedBodyCount;
 
-	EVP_MD_CTX m_mdctx;
+	EVP_MD_CTX m_Hdr_ctx;
+	EVP_MD_CTX m_Bdy_ctx;
 	SelectorInfo *m_pSelector;
 
 	int Status;
@@ -110,6 +120,7 @@ protected:
 	DKIMDNSCALLBACK m_pfnPolicyCallback;		// policy record callback
 
 	bool m_HonorBodyLengthTag;
+	bool m_CheckPolicy;
 
 	vector<DKIMVerifyDetails> Details;
 	string Policy;
