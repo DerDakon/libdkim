@@ -11,4 +11,5 @@ EXPORTS
 	DKIMVerifyFree
 	DKIMVersion
 	DKIMGetErrorString
+	DKIMSignGetSig2
 

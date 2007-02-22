@@ -18,8 +18,8 @@
 #include <windows.h>
 #pragma warning( disable: 4786 )
 #else
-#define strnicmp strncasecmp 
-#define stricmp strcasecmp 
+#define _strnicmp strncasecmp 
+#define _stricmp strcasecmp 
 #endif
 
 #include "dkim.h"
@@ -378,6 +378,7 @@ CDKIMVerify::CDKIMVerify()
 	m_pfnPolicyCallback = NULL;
 	m_HonorBodyLengthTag = false;
 	m_CheckPolicy = false;
+	m_SubjectIsRequired = true;
 }
 
 CDKIMVerify::~CDKIMVerify()
@@ -405,6 +406,7 @@ int CDKIMVerify::Init( DKIMVerifyOptions* pOptions )
 
 	m_HonorBodyLengthTag = pOptions->nHonorBodyLengthTag != 0;
 	m_CheckPolicy = pOptions->nCheckPolicy != 0;
+	m_SubjectIsRequired = pOptions->nSubjectRequired == 0;
 
 	return nRet;
 }
@@ -545,7 +547,7 @@ int CDKIMVerify::GetResults(void)
 	{
 		for (list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i)
 		{
-			if (strnicmp(i->c_str(), "From:", 5) == 0)
+			if (_strnicmp(i->c_str(), "From:", 5) == 0)
 			{
 				vector<string> Addresses;
 				if (ParseAddresses(i->substr(5), Addresses))
@@ -567,7 +569,7 @@ int CDKIMVerify::GetResults(void)
 			// see if the successful domain is the same as or a parent of the From domain
 			if (i->length() > sFromDomain.length())
 				continue;
-			if (stricmp(i->c_str(), sFromDomain.c_str()+sFromDomain.length()-i->length()) != 0)
+			if (_stricmp(i->c_str(), sFromDomain.c_str()+sFromDomain.length()-i->length()) != 0)
 				continue;
 			if (i->length() == sFromDomain.length() || sFromDomain.c_str()[sFromDomain.length()-i->length()-1] == '.')
 			{
@@ -672,7 +674,7 @@ int CDKIMVerify::ProcessHeaders(void)
 	// look for DKIM-Signature header(s)
 	for( list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i )
 	{
-		if( strnicmp(i->c_str(), "DKIM-Signature:", 15 ) == 0 && Signatures.size() < MAX_SIGNATURES )
+		if( _strnicmp(i->c_str(), "DKIM-Signature:", 15 ) == 0 && Signatures.size() < MAX_SIGNATURES )
 		{
 			SignatureInfo sig;
 			sig.Status = ParseDKIMSignature( *i, sig );
@@ -710,7 +712,7 @@ int CDKIMVerify::ProcessHeaders(void)
 				sig.Status = DKIM_SELECTOR_ALGORITHM_MISMATCH;			// causes signature to be ignored
 
 			// check for same domain
-			if (sel.SameDomain && stricmp(sig.Domain.c_str(), sig.IdentityDomain.c_str()) != 0)
+			if (sel.SameDomain && _stricmp(sig.Domain.c_str(), sig.IdentityDomain.c_str()) != 0)
 				sig.Status = DKIM_BAD_SYNTAX;
 		}
 
@@ -737,7 +739,7 @@ int CDKIMVerify::ProcessHeaders(void)
 			list<string>::reverse_iterator i;
 			for( i = HeaderList.rbegin(); i != HeaderList.rend(); ++i )
 			{
-				if (strnicmp(i->c_str(), x->c_str(), x->length()) == 0 && i->c_str()[x->length()] == ':' && find(used.begin(), used.end(), i) == used.end())
+				if (_strnicmp(i->c_str(), x->c_str(), x->length()) == 0 && i->c_str()[x->length()] == ':' && find(used.begin(), used.end(), i) == used.end())
 					break;
 			}
 
@@ -840,7 +842,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	// check signature version
 	if (values[0] != NULL)
 	{
-		if (strcmp(values[0], "0.2") == 0 || strcmp(values[0], "0.3") == 0 || strcmp(values[0], "0.4") == 0)
+		if (strcmp(values[0], "0.2") == 0 || strcmp(values[0], "0.3") == 0 || strcmp(values[0], "0.4") == 0 || strcmp(values[0], "0.5") == 0)
 		{
 			sig.Version = DKIM_SIG_VERSION_02_PLUS;
 		}
@@ -975,7 +977,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 		// todo: maybe create a new error code for invalid identity domain
 		if (idomainlen < ddomainlen)
 			return DKIM_BAD_SYNTAX;
-		if (stricmp(idomain+idomainlen-ddomainlen, values[3]) != 0)
+		if (_stricmp(idomain+idomainlen-ddomainlen, values[3]) != 0)
 			return DKIM_BAD_SYNTAX;
 		if (idomainlen > ddomainlen && idomain[idomainlen-ddomainlen-1] != '.')
 			return DKIM_BAD_SYNTAX;
@@ -1008,7 +1010,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 				HasDNS = true;
 				break;
 			}
-			s = strtok(NULL, ":");
+			s = strtok(NULL, ": \t");
 		}
 		if (!HasDNS)
 			return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for unknown query method
@@ -1036,13 +1038,15 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	}
 
 	// parse the signed headers list
-	bool HasFrom = false;
+	bool HasFrom = false, HasSubject = false;
 	RemoveSWSP(values[4]);			// header names shouldn't have spaces in them so this should be ok...
 	char *s = strtok(values[4], ":");
 	while (s != NULL)
 	{
-		if (stricmp(s, "From") == 0)
+		if (_stricmp(s, "From") == 0)
 			HasFrom = true;
+		else if (_stricmp(s, "Subject") == 0)
+			HasSubject = true;
 
 		sig.SignedHeaders.push_back(s);
 
@@ -1051,6 +1055,8 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 
 	if (!HasFrom)
 		return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for h= missing From
+	if (m_SubjectIsRequired && !HasSubject)
+		return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for h= missing Subject
 
 	return DKIM_SUCCESS;
 }
@@ -1263,7 +1269,7 @@ SelectorInfo &CDKIMVerify::GetSelector( const string &sSelector, const string &s
 	// see if we already have this selector
 	for ( list<SelectorInfo>::iterator i = Selectors.begin(); i != Selectors.end(); ++i )
 	{
-		if ( stricmp(i->Selector.c_str(), sSelector.c_str()) == 0 && stricmp(i->Domain.c_str(), sDomain.c_str()) == 0)
+		if ( _stricmp(i->Selector.c_str(), sSelector.c_str()) == 0 && _stricmp(i->Domain.c_str(), sDomain.c_str()) == 0)
 		{
 			return *i;
 		}
@@ -1423,7 +1429,7 @@ int CDKIMVerify::GetDetails( int* nSigCount, DKIMVerifyDetails** pDetails )
 	}
 
 	*nSigCount = Details.size();
-	*pDetails = &Details[0];
+	*pDetails = (*nSigCount != 0) ? &Details[0] : NULL;
 
 	return DKIM_SUCCESS;
 }

@@ -19,8 +19,8 @@
 #pragma warning( disable: 4786 )
 #pragma warning( disable: 4503 )
 #else
-#define strnicmp strncasecmp 
-#define stricmp strcasecmp 
+#define _strnicmp strncasecmp 
+#define _stricmp strcasecmp 
 #endif
 
 #include <string.h>
@@ -186,9 +186,9 @@ bool CDKIMSign::SignThisTag( const string& sTag )
 {
 	bool bRet = true;
 
-	if( strnicmp( sTag.c_str(), "X-", 2 ) == 0 || 
-		stricmp( sTag.c_str(), "Authentication-Results:" ) == 0 ||
-		stricmp( sTag.c_str(), "Return-Path:" ) == 0 )
+	if( _strnicmp( sTag.c_str(), "X-", 2 ) == 0 || 
+		_stricmp( sTag.c_str(), "Authentication-Results:" ) == 0 ||
+		_stricmp( sTag.c_str(), "Return-Path:" ) == 0 )
 	{
 		bRet = false;
 	}
@@ -231,14 +231,14 @@ bool ConvertHeaderToQuotedPrintable(const char *source, char* dest)
 ////////////////////////////////////////////////////////////////////////////////
 void CDKIMSign::GetHeaderParams( const string& sHdr )
 {
-	if ( strnicmp( sHdr.c_str(), "X", 1) == 0)
+	if ( _strnicmp( sHdr.c_str(), "X", 1) == 0)
 		return;
 
-	if( strnicmp( sHdr.c_str(), "From:", 5 ) == 0 )
+	if( _strnicmp( sHdr.c_str(), "From:", 5 ) == 0 )
 	{
 		sFrom.assign( sHdr.c_str() + 5 );
 	}
-	if( strnicmp( sHdr.c_str(), "Sender:", 7 ) == 0 )
+	if( _strnicmp( sHdr.c_str(), "Sender:", 7 ) == 0 )
 	{
 		sSender.assign( sHdr.c_str() + 7 );
 	}	
@@ -305,7 +305,7 @@ int CDKIMSign::ProcessHeaders(void)
 			sTag.erase( pos + 1, string::npos );
 
 			// is this the From: header?
-			if( stricmp( sTag.c_str(), "From:" ) == 0 )
+			if( _stricmp( sTag.c_str(), "From:" ) == 0 )
 			{
 				bFromHeaderFound = true;
 				nSignThisTag = 1;
@@ -343,7 +343,7 @@ int CDKIMSign::ProcessHeaders(void)
 				// walk the list in reverse looking for the last instance of this header
 				while ( riter != HeaderList.rend() )
 				{
-					if( strnicmp( riter->c_str(), sTag.c_str(), sTag.size() ) == 0 )
+					if( _strnicmp( riter->c_str(), sTag.c_str(), sTag.size() ) == 0 )
 					{
 						ProcessHeader( *riter );
 
@@ -725,7 +725,7 @@ bool CDKIMSign::IsRequiredHeader( const string& sTag )
 		}
 		else
 		{
-			if( stricmp( sTag.c_str(), sRequiredHeaders.substr( start, end - start + 1 ).c_str() ) == 0 )
+			if( _stricmp( sTag.c_str(), sRequiredHeaders.substr( start, end - start + 1 ).c_str() ) == 0 )
 			{
 				sRequiredHeaders.erase( start, end - start + 1 );
 				return true;
@@ -761,7 +761,7 @@ int CDKIMSign::ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool 
 
 	if( bUseIetfBodyHash )
 	{
-		AddTagToSig( "v", "0.4", 0, false );
+		AddTagToSig( "v", "0.5", 0, false );
 	}
 
 	AddTagToSig( "a", bUseSha256 ? "rsa-sha256" : "rsa-sha1", 0, false );
@@ -810,7 +810,7 @@ int CDKIMSign::ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool 
 	
 	if( m_nIncludeQueryMethod )
 	{
-		AddTagToSig( "q", "dns", 0, false );
+		AddTagToSig( "q", "dns/txt", 0, false );
 	}
 
 	AddTagToSig( "h", hParam, ':', true );
@@ -859,8 +859,11 @@ int CDKIMSign::ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool 
 		BIO_free_all(b64);
 
 		// this should never happen
-		if (size >= len) 
+		if (size >= len)
+		{
+			delete[] buf;
 			return DKIM_OUT_OF_MEMORY;  
+		}
 
 		buf[size] = '\0';
 
@@ -972,8 +975,11 @@ int CDKIMSign::ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool 
     BIO_free_all(b64);
 
 	// this should never happen
-    if (size >= len) 
+    if (size >= len)
+	{
+		delete[] buf;
 		return DKIM_OUT_OF_MEMORY;  
+	}
 
     buf[size] = '\0';
 

@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 	opts.pfnHeaderCallback = SignThisHeader;
 	strcpy( opts.szRequiredHeaders, "NonExistant" );
 	opts.nIncludeCopiedHeaders = 0;
-	opts.nIncludeBodyHash = 1;
+	opts.nIncludeBodyHash = DKIM_BODYHASH_BOTH;
 
 	int nArgParseState = 0;
 	bool bSign = true;

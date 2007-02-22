@@ -227,6 +227,7 @@ int CDKIMBase::ProcessFinal(void)
 	{
 		m_InHeaders = false;
 		ProcessHeaders();
+		ProcessBody("", 0);
 	}
 
 	return DKIM_SUCCESS;

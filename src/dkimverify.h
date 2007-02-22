@@ -121,6 +121,7 @@ protected:
 
 	bool m_HonorBodyLengthTag;
 	bool m_CheckPolicy;
+	bool m_SubjectIsRequired;
 
 	vector<DKIMVerifyDetails> Details;
 	string Policy;

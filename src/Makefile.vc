@@ -12,8 +12,8 @@ CC	=	cl /nologo
 AR	=	lib /nologo
 LD	=	link /nologo
 
-OPENSSL_INC = ../MDaemon/OpenSSL/inc32
-OPENSSL_LIB = ../MDaemon/OpenSSL
+OPENSSL_INC = ../OpenSSL/inc32
+OPENSSL_LIB = ../OpenSSL
 
 !IFDEF DEBUG
 OUTDIR	= Debug

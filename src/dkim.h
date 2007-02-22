@@ -125,6 +125,7 @@ typedef struct DKIMVerifyOptions_t
 	DKIMDNSCALLBACK pfnPolicyCallback;		// policy record callback
 	int nHonorBodyLengthTag;				// 0 = ignore l= tag, 1 = use l= tag to limit the amount of body verified
 	int nCheckPolicy;						// 0 = use default (signs some) policy, 1 = request and use sender's policy
+	int nSubjectRequired;					// 0 = subject is required to be signed, 1 = not required
 } DKIMVerifyOptions;
 
 typedef struct DKIMVerifyDetails_t
