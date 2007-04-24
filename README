@@ -1,6 +1,12 @@
 Alt-N DKIM Open Source Project
 Copyright 2007 Alt-N Technologies, Ltd.
 
+---------------------
+1.0.14 April 24, 2007
+---------------------
+  o updated to final publication of DKIM (version 1)
+  o fix to buffer overflow parsing malformed To headers
+
 ------------------------
 1.0.13 February 22, 2007
 ------------------------

@@ -761,7 +761,7 @@ int CDKIMSign::ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool 
 
 	if( bUseIetfBodyHash )
 	{
-		AddTagToSig( "v", "0.5", 0, false );
+		AddTagToSig( "v", "1", 0, false );
 	}
 
 	AddTagToSig( "a", bUseSha256 ? "rsa-sha256" : "rsa-sha1", 0, false );
@@ -810,7 +810,7 @@ int CDKIMSign::ConstructSignature( char* szPrivKey, bool bUseIetfBodyHash, bool 
 	
 	if( m_nIncludeQueryMethod )
 	{
-		AddTagToSig( "q", "dns/txt", 0, false );
+		AddTagToSig( "q", bUseIetfBodyHash ? "dns/txt" : "dns" , 0, false );
 	}
 
 	AddTagToSig( "h", hParam, ':', true );

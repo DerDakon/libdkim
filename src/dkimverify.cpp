@@ -308,15 +308,17 @@ bool ParseAddresses( string str, vector<string> &Addresses )
 			{
 				// copy the contents of a quoted string
 				from++;
-				while (*from != '"')
+				while (*from != '\0')
 				{
-					if (*from == '\0')
+					if (*from == '"')
+					{
+						from++;
 						break;
+					}
 					else if (*from == '\\' && from[1] != '\0')
 						*to++ = *from++;
 					*to++ = *from++;
 				}
-				from++;
 			}
 			else if (*from == '\\' && from[1] != '\0')
 			{
@@ -542,8 +544,9 @@ int CDKIMVerify::GetResults(void)
 	}
 
 
-	// get the From address's domain
+	// get the From address's domain if we might need it
 	string sFromDomain;
+	if (SuccessCount > 0 || m_CheckPolicy)
 	{
 		for (list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i)
 		{
@@ -562,7 +565,7 @@ int CDKIMVerify::GetResults(void)
 
 	// if a signature from the From domain verified successfully, return success now
 	// without checking the policy
-	if (!sFromDomain.empty() && SuccessCount > 0)
+	if (SuccessCount > 0 && !sFromDomain.empty())
 	{
 		for (list<string>::iterator i = SuccessfulDomains.begin(); i != SuccessfulDomains.end(); ++i)
 		{
@@ -842,7 +845,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	// check signature version
 	if (values[0] != NULL)
 	{
-		if (strcmp(values[0], "0.2") == 0 || strcmp(values[0], "0.3") == 0 || strcmp(values[0], "0.4") == 0 || strcmp(values[0], "0.5") == 0)
+		if (strcmp(values[0], "1") == 0 || strcmp(values[0], "0.5") == 0 || strcmp(values[0], "0.4") == 0 || strcmp(values[0], "0.3") == 0 || strcmp(values[0], "0.2") == 0)
 		{
 			sig.Version = DKIM_SIG_VERSION_02_PLUS;
 		}

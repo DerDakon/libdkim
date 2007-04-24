@@ -8,7 +8,7 @@
 #define VER_REV   13
 #define VER_BUILD 0
 
-#define VERSION_STRING "1.0.13"
+#define VERSION_STRING "1.0.14"
 
 #define IDS_PROJNAME                    100
 #define IDR_WMDMLOGGER                  101
