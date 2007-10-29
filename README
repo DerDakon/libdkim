@@ -1,6 +1,31 @@
 Alt-N DKIM Open Source Project
 Copyright 2007 Alt-N Technologies, Ltd.
 
+-----------------------
+1.0.17 October 29, 2007
+-----------------------
+
+  o verifier fully supports g= value wildcard matching
+  o fix to verifier not canonicalizing message headers that
+    had whitespace between the header name and :
+  o fix to verifier not validating t= value or comparing it
+    to the x= value
+  o fix to verifier accepting blank values for l= and x=
+
+----------------------
+1.0.16 August 22, 2007
+----------------------
+
+  o supports SSP (Sender Signing Practices) draft 00
+  o added verifier option to save canonicalized message data
+
+-------------------
+1.0.15 May 30, 2007
+-------------------
+
+  o fix to DKIM_FAIL being returned for messages with
+    invalid signatures
+
 ---------------------
 1.0.14 April 24, 2007
 ---------------------

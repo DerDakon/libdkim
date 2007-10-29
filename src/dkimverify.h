@@ -20,11 +20,9 @@
 #include "dkimbase.h"
 #include <vector>
 
-#define DKIM_POLICY_SIGNS_SOME					1
-#define DKIM_POLICY_SIGNS_ALL					2
-#define DKIM_POLICY_SIGNS_ALL_NO_THIRD_PARTY	3
-#define DKIM_POLICY_NEVER_SENDS_EMAIL			4
-#define DKIM_POLICY_REPEAT_AT_USER_LEVEL		5
+#define DKIM_SSP_UNKNOWN			1
+#define DKIM_SSP_ALL				2
+#define DKIM_SSP_STRICT				3
 
 #define DKIM_POLICY_DOMAIN_NAME_TOO_LONG	-50		// internal error
 #define DKIM_POLICY_DNS_TEMP_FAILURE		-51		// internal error
@@ -58,7 +56,7 @@ public:
 class SignatureInfo
 {
 public:
-	SignatureInfo();
+	SignatureInfo(bool SaveCanonicalizedData);
 	~SignatureInfo();
 
 	void Hash( const char* szBuffer, unsigned nBufLength, bool IsBody=false );
@@ -71,6 +69,7 @@ public:
 	string BodyHashData;
 	string IdentityLocalPart;
 	string IdentityDomain;
+	string CanonicalizedData;
 	vector<string> SignedHeaders;
 	unsigned BodyLength;
 	unsigned HeaderCanonicalization;
@@ -86,6 +85,7 @@ public:
 
 	int Status;
 	int m_nHash;						// use one of the DKIM_HASH_xxx constants here
+	bool m_SaveCanonicalizedData;
 };
 
 class CDKIMVerify : public CDKIMBase
@@ -103,7 +103,7 @@ public:
 	virtual int ProcessHeaders(void);
 	virtual int ProcessBody( char* szBuffer, int nBufLength );
 
-	const char* GetPolicy() { return Policy.c_str(); }
+	const char* GetPractices() { return Practices.c_str(); }
 
 protected:
 
@@ -111,20 +111,21 @@ protected:
 
 	SelectorInfo& GetSelector( const string &sSelector, const string &sDomain );
 
-	int GetPolicy( const string &sDomain, int &iPolicy, bool &bTesting);
+	int GetSSP( const string &sDomain, int &iSSP, bool &bTesting );
 
 	list<SignatureInfo> Signatures;
 	list<SelectorInfo> Selectors;
 
 	DKIMDNSCALLBACK m_pfnSelectorCallback;		// selector record callback
-	DKIMDNSCALLBACK m_pfnPolicyCallback;		// policy record callback
+	DKIMDNSCALLBACK m_pfnPracticesCallback;		// SSP record callback
 
 	bool m_HonorBodyLengthTag;
-	bool m_CheckPolicy;
+	bool m_CheckPractices;
 	bool m_SubjectIsRequired;
+	bool m_SaveCanonicalizedData;
 
 	vector<DKIMVerifyDetails> Details;
-	string Policy;
+	string Practices;
 };
 
 #endif //DKIMVERIFY_H

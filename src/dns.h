@@ -30,19 +30,10 @@
 
 #define DNSRESP_SUCCESS					0	// DNS lookup returned sought after records
 #define DNSRESP_TEMP_FAIL				1	// No response from DNS server
-#define DNSRESP_PERM_FAIL				2	// DNS server replied but no records found
+#define DNSRESP_PERM_FAIL				2	// DNS server returned error or no records
 #define DNSRESP_DOMAIN_NAME_TOO_LONG	3	// Domain name too long
+#define DNSRESP_NXDOMAIN				4	// DNS server returned Name Error
+#define DNSRESP_EMPTY					5	// DNS server returned successful response but no records
 
-// Pass in the user and domain. This function combines them into the FQDN
-// to query
-int DNSGetPolicy( const char* szUser, const char* szDomain, char* Buffer, int nBufLen );
-
-// Pass in the FQDN to get the policy
-int DNSGetPolicy( const char *szFQDN, char* Buffer, int nBufLen );
-
-// Pass in the selector name and domain name. This function combines them into 
-// the fqdn to query.
-int DNSGetKey( const char* szSelector, const char* szDomain, char* Buffer, int nBufLen );
-
-// Pass in the FQDN to get the selector
-int DNSGetKey( const char* szFQDN, char* Buffer, int nBufLen );
+// Pass in the FQDN to get the TXT record
+int DNSGetTXT( const char *szFQDN, char* Buffer, int nBufLen );

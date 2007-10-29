@@ -33,7 +33,7 @@
 #define MAX_SIGNATURES	10			// maximum number of DKIM signatures to process in a message
 
 
-SignatureInfo::SignatureInfo()
+SignatureInfo::SignatureInfo(bool s)
 {
 	VerifiedBodyCount = 0;
 	UnverifiedBodyCount = 0;
@@ -41,6 +41,7 @@ SignatureInfo::SignatureInfo()
 	EVP_MD_CTX_init( &m_Bdy_ctx );
 	m_pSelector = NULL;
 	Status = DKIM_SUCCESS;
+	m_SaveCanonicalizedData = s;
 }
 
 SignatureInfo::~SignatureInfo()
@@ -237,20 +238,27 @@ unsigned DecodeBase64(char *ptr)
 ////////////////////////////////////////////////////////////////////////////////
 // 
 // Match a string with a pattern (used for g= value)
+// Supports a single, optional "*" wildcard character.
 //
 ////////////////////////////////////////////////////////////////////////////////
 bool WildcardMatch( const char *p, const char *s )
 {
-	// this stops matching at a *.  todo: support * mid-string
-	for (;;)
+	// special case: An empty "g=" value never matches any addresses
+	if (*p == '\0')
+		return false;
+
+	const char *wildcard = strchr(p, '*');
+	if (wildcard == NULL)
 	{
-		if (*p == '*')
-			return true;
-		if (*p != *s)
-			return false;
-		if (*p == '\0')
-			return true;
-		p++, s++;
+		return strcmp(s, p) == 0;
+	}
+	else
+	{
+		unsigned beforewildcardlen = wildcard-p;
+		unsigned afterwildcardlen = strlen(wildcard+1);
+		unsigned slen = strlen(s);
+		return (slen >= beforewildcardlen+afterwildcardlen) && 
+			(strncmp(s, p, beforewildcardlen) == 0) && strcmp(s+slen-afterwildcardlen, wildcard+1) == 0;
 	}
 }
 
@@ -377,10 +385,11 @@ bool ParseAddresses( string str, vector<string> &Addresses )
 CDKIMVerify::CDKIMVerify()
 {
 	m_pfnSelectorCallback = NULL;
-	m_pfnPolicyCallback = NULL;
+	m_pfnPracticesCallback = NULL;
 	m_HonorBodyLengthTag = false;
-	m_CheckPolicy = false;
+	m_CheckPractices = false;
 	m_SubjectIsRequired = true;
+	m_SaveCanonicalizedData = false;
 }
 
 CDKIMVerify::~CDKIMVerify()
@@ -397,18 +406,19 @@ int CDKIMVerify::Init( DKIMVerifyOptions* pOptions )
 	int nRet = CDKIMBase::Init();
 
 	m_pfnSelectorCallback = pOptions->pfnSelectorCallback;
-	m_pfnPolicyCallback = pOptions->pfnPolicyCallback;
+	m_pfnPracticesCallback = pOptions->pfnPracticesCallback;
 
 #ifdef WIN32
 	if (m_pfnSelectorCallback)
 		assert(!IsBadCodePtr( (FARPROC) m_pfnSelectorCallback ));
-	if (m_pfnPolicyCallback)
-		assert(!IsBadCodePtr( (FARPROC) m_pfnPolicyCallback ));
+	if (m_pfnPracticesCallback)
+		assert(!IsBadCodePtr( (FARPROC) m_pfnPracticesCallback ));
 #endif
 
 	m_HonorBodyLengthTag = pOptions->nHonorBodyLengthTag != 0;
-	m_CheckPolicy = pOptions->nCheckPolicy != 0;
+	m_CheckPractices = pOptions->nCheckPractices != 0;
 	m_SubjectIsRequired = pOptions->nSubjectRequired == 0;
+	m_SaveCanonicalizedData = pOptions->nSaveCanonicalizedData != 0;
 
 	return nRet;
 }
@@ -535,7 +545,7 @@ int CDKIMVerify::GetResults(void)
 				}
 			}
 		}
-		else if (i->Status == DKIM_SELECTOR_GRANULARITY_MISMATCH || i->Status == DKIM_SELECTOR_KEY_REVOKED)
+		else if (i->Status == DKIM_SELECTOR_GRANULARITY_MISMATCH || i->Status == DKIM_SELECTOR_ALGORITHM_MISMATCH || i->Status == DKIM_SELECTOR_KEY_REVOKED)
 		{
 			// treat these as failures
 			// todo: maybe see if the selector is in testing mode?
@@ -546,7 +556,7 @@ int CDKIMVerify::GetResults(void)
 
 	// get the From address's domain if we might need it
 	string sFromDomain;
-	if (SuccessCount > 0 || m_CheckPolicy)
+	if (SuccessCount > 0 || m_CheckPractices)
 	{
 		for (list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i)
 		{
@@ -564,7 +574,7 @@ int CDKIMVerify::GetResults(void)
 	}
 
 	// if a signature from the From domain verified successfully, return success now
-	// without checking the policy
+	// without checking the sender signing practices
 	if (SuccessCount > 0 && !sFromDomain.empty())
 	{
 		for (list<string>::iterator i = SuccessfulDomains.begin(); i != SuccessfulDomains.end(); ++i)
@@ -581,42 +591,34 @@ int CDKIMVerify::GetResults(void)
 		}
 	}
 
-	// get the policy
-	int iPolicy = DKIM_POLICY_SIGNS_SOME;
-	bool bPolicyIsTesting = false;
+	// get the sender signing practices
+	int iPractices = DKIM_SSP_UNKNOWN;
+	bool bTestingPractices = false;
 
-	if (m_CheckPolicy && !sFromDomain.empty())
+	if (m_CheckPractices && !sFromDomain.empty())
 	{
-		int PolicyStatus = GetPolicy(sFromDomain, iPolicy, bPolicyIsTesting);
-		if (PolicyStatus != DKIM_SUCCESS)
+		int SSPStatus = GetSSP(sFromDomain, iPractices, bTestingPractices);
+		if (SSPStatus != DKIM_SUCCESS)
 		{
-			// could not get policy, leave values at the defaults
+			// could not get practices, leave values at the defaults
 		}
 	}
 
 	// if there was a successful third-party signature and third-party signatures are allowed, return success
-	if (SuccessCount > 0 && (iPolicy == DKIM_POLICY_SIGNS_SOME || iPolicy == DKIM_POLICY_SIGNS_ALL))
+	if (SuccessCount > 0 && (iPractices == DKIM_SSP_UNKNOWN || iPractices == DKIM_SSP_ALL))
 	{
 		return SuccessCount == Signatures.size() ? DKIM_SUCCESS : DKIM_PARTIAL_SUCCESS;
 	}
 
-	// if any selectors were testing or the policy is testing return neutral
-	if (TestingFailures >0 || bPolicyIsTesting)
+	// if the SSP is testing, return neutral
+	if (bTestingPractices)
 		return DKIM_NEUTRAL;
 
 	// if the message should be signed, return fail
-	if (iPolicy == DKIM_POLICY_SIGNS_ALL || iPolicy == DKIM_POLICY_SIGNS_ALL_NO_THIRD_PARTY)
+	if (iPractices == DKIM_SSP_ALL || iPractices == DKIM_SSP_STRICT)
 		return DKIM_FAIL;
 
-	// if the message has a signature that didn't verify return fail
-	if (RealFailures > 0)
-		return DKIM_FAIL;
-
-	// if the policy is no email sent, return fail
-	if (iPolicy == DKIM_POLICY_NEVER_SENDS_EMAIL)
-		return DKIM_FAIL;
-
-	// return neutral for everything else?
+	// return neutral for everything else
 	return DKIM_NEUTRAL;
 }
 
@@ -664,6 +666,11 @@ void SignatureInfo::Hash( const char* szBuffer, unsigned nBufLength, bool IsBody
 	{
 		EVP_VerifyUpdate( &m_Hdr_ctx, szBuffer, nBufLength );
 	}
+
+	if (m_SaveCanonicalizedData)
+	{
+		CanonicalizedData.append( szBuffer, nBufLength );
+	}
 }
 
 
@@ -679,7 +686,7 @@ int CDKIMVerify::ProcessHeaders(void)
 	{
 		if( _strnicmp(i->c_str(), "DKIM-Signature:", 15 ) == 0 && Signatures.size() < MAX_SIGNATURES )
 		{
-			SignatureInfo sig;
+			SignatureInfo sig(m_SaveCanonicalizedData);
 			sig.Status = ParseDKIMSignature( *i, sig );
 			Signatures.push_back( sig );
 		}
@@ -712,7 +719,7 @@ int CDKIMVerify::ProcessHeaders(void)
 
 			// check the hash algorithm
 			if ( (sig.m_nHash == DKIM_HASH_SHA1 && !sel.AllowSHA1) || (sig.m_nHash == DKIM_HASH_SHA256 && !sel.AllowSHA256) )
-				sig.Status = DKIM_SELECTOR_ALGORITHM_MISMATCH;			// causes signature to be ignored
+				sig.Status = DKIM_SELECTOR_ALGORITHM_MISMATCH;			// causes signature to fail
 
 			// check for same domain
 			if (sel.SameDomain && _stricmp(sig.Domain.c_str(), sig.IdentityDomain.c_str()) != 0)
@@ -742,8 +749,15 @@ int CDKIMVerify::ProcessHeaders(void)
 			list<string>::reverse_iterator i;
 			for( i = HeaderList.rbegin(); i != HeaderList.rend(); ++i )
 			{
-				if (_strnicmp(i->c_str(), x->c_str(), x->length()) == 0 && i->c_str()[x->length()] == ':' && find(used.begin(), used.end(), i) == used.end())
-					break;
+				if (_strnicmp(i->c_str(), x->c_str(), x->length()) == 0)
+				{
+					// skip over whitespace between the header name and :
+					const char *s = i->c_str()+x->length();
+					while (*s == ' ' || *s == '\t')
+						s++;
+					if (*s == ':' && find(used.begin(), used.end(), i) == used.end())
+						break;
+				}
 			}
 
 			if (i != HeaderList.rend())
@@ -805,10 +819,9 @@ bool ParseUnsigned(const char *s, unsigned *result)
 	unsigned temp=0, last=0;
 	bool overflowed = false;
 
-	while (*s != '\0')
-	{
+	do {
 		if (*s < '0' || *s > '9')
-			return false;
+			return false;				// returns false for an initial '\0'
 
 		temp = temp * 10 + (*s - '0');
 		if (temp < last)
@@ -816,7 +829,7 @@ bool ParseUnsigned(const char *s, unsigned *result)
 		last = temp;
 
 		s++;
-	}
+	} while (*s != '\0');
 
 	*result = overflowed ? -1 : temp;
 	return true;
@@ -857,6 +870,9 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	}
 	else
 	{
+		// Note:  DKIM Interop 1 pointed out that v= is now required, but we do
+		// not enforce that in order to verify signatures made by older drafts.
+
 		// prior to 0.2, there MUST NOT have been a v=
 		// (optionally) support these signatures, for backwards compatibility
 		if (true)
@@ -865,7 +881,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 		}
 		else
 		{
-			return DKIM_STAT_INCOMPAT;
+			return DKIM_BAD_SYNTAX;
 		}
 	}
 
@@ -1019,6 +1035,14 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 			return DKIM_BAD_SYNTAX;		// todo: maybe create a new error code for unknown query method
 	}
 
+	// signature time
+	unsigned SignedTime = -1;
+	if (values[10] != NULL)
+	{
+		if (!ParseUnsigned(values[10], &SignedTime))
+			return DKIM_BAD_SYNTAX;
+	}
+
 	// expiration time
 	if (values[11] == NULL)
 	{
@@ -1031,8 +1055,10 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 
 		if (sig.ExpireTime != -1)
 		{
-			// todo: compare the expire time to the t= value
 			// the value of x= MUST be greater than the value of t= if both are present
+			if (SignedTime != -1 && sig.ExpireTime <= SignedTime)
+				return DKIM_BAD_SYNTAX;
+
 			// todo: if possible, use the received date/time instead of the current time
 			unsigned curtime = time(NULL);
 			if (curtime > sig.ExpireTime)
@@ -1293,7 +1319,7 @@ SelectorInfo &CDKIMVerify::GetSelector( const string &sSelector, const string &s
 	if ( m_pfnSelectorCallback )
 		DNSResult = m_pfnSelectorCallback( sFQDN.c_str(), Buffer, BufLen );
 	else
-		DNSResult = DNSGetKey( sFQDN.c_str(), Buffer, BufLen );
+		DNSResult = DNSGetTXT( sFQDN.c_str(), Buffer, BufLen );
 
 	switch (DNSResult)
 	{
@@ -1321,66 +1347,72 @@ SelectorInfo &CDKIMVerify::GetSelector( const string &sSelector, const string &s
 
 ////////////////////////////////////////////////////////////////////////////////
 // 
-// GetPolicy - Get a DKIM policy for a domain
+// GetSSP - Get DKIM Sender Signing Practices for a domain
 //
 ////////////////////////////////////////////////////////////////////////////////
-int CDKIMVerify::GetPolicy( const string &sDomain, int &iPolicy, bool &bTesting)
+int CDKIMVerify::GetSSP( const string &sDomain, int &iSSP, bool &bTesting )
 {
-	string sFQDN = "_policy._domainkey.";
+	string sFQDN = "_ssp._domainkey.";
 	sFQDN += sDomain;
 
 	char Buffer[1024];
 	int BufLen = 1024;
 
 	int DNSResult;
-	
-	if ( m_pfnPolicyCallback )
-		DNSResult = m_pfnPolicyCallback( sFQDN.c_str(), Buffer, BufLen );
+	bool bIsParentSSP = false;
+
+	if ( m_pfnPracticesCallback )
+		DNSResult = m_pfnPracticesCallback( sFQDN.c_str(), Buffer, BufLen );
 	else
-		DNSResult = DNSGetPolicy( sFQDN.c_str(), Buffer, BufLen );
+	{
+		DNSResult = DNSGetTXT( sFQDN.c_str(), Buffer, BufLen );
+
+		if (DNSResult != DNSRESP_SUCCESS)
+		{
+			DNSResult = DNSGetTXT( sDomain.c_str(), Buffer, BufLen );
+			if (DNSResult == DNSRESP_NXDOMAIN)
+			{
+				return DKIM_POLICY_DNS_PERM_FAILURE;
+			}
+
+			unsigned pos = sDomain.find('.');
+			if (pos == -1 || sDomain.find('.', pos+1) == -1)
+			{
+				// SSP not found but the domain exists, it's non-suspicious
+				iSSP = DKIM_SSP_UNKNOWN;
+				bTesting = false;
+				return DKIM_SUCCESS;
+			}
+
+			DNSResult = DNSGetTXT( sDomain.substr(pos+1).c_str(), Buffer, BufLen );
+			if (DNSResult != DNSRESP_SUCCESS)
+			{
+				return DNSRESP_PERM_FAIL;
+			}
+			bIsParentSSP = true;
+		}
+	}
 
 	switch (DNSResult)
 	{
 	case DNSRESP_SUCCESS:
 		{
-			Policy = Buffer;
+			Practices = Buffer;
 
-			static const char *tags[] = {"o","t","n","r","u",NULL};
+			static const char *tags[] = {"dkim","t",NULL};
 			char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
 
 			if (!ParseTagValueList(Buffer, tags, values))
 				return DKIM_POLICY_INVALID;
 
-			if (values[0] == NULL || values[0][0] == '\0' || values[0][1] != '\0')
+			// practices
+			iSSP = DKIM_SSP_UNKNOWN;
+			if (values[0] != NULL)
 			{
-				// use the default policy if o= is missing or has a bad value
-				iPolicy = DKIM_POLICY_SIGNS_SOME;
-			}
-			else
-			{
-				switch (values[0][0])
-				{
-				case '~':
-				default:
-					iPolicy = DKIM_POLICY_SIGNS_SOME;
-					break;
-
-				case '-':
-					iPolicy = DKIM_POLICY_SIGNS_ALL;
-					break;
-
-				case '!':
-					iPolicy = DKIM_POLICY_SIGNS_ALL_NO_THIRD_PARTY;
-					break;
-
-				case '.':
-					iPolicy = DKIM_POLICY_NEVER_SENDS_EMAIL;
-					break;
-
-				case '^':
-					iPolicy = DKIM_POLICY_REPEAT_AT_USER_LEVEL;
-					break;
-				}
+				if (strcmp(values[0], "all") == 0)
+					iSSP = DKIM_SSP_ALL;
+				else if (strcmp(values[0], "strict") == 0)
+					iSSP = DKIM_SSP_STRICT;
 			}
 
 			bTesting = false;
@@ -1394,6 +1426,17 @@ int CDKIMVerify::GetPolicy( const string &sDomain, int &iPolicy, bool &bTesting)
 					if (strcmp(s, "y") == 0)
 					{
 						bTesting = true;
+					}
+					else if (strcmp(s, "s") == 0)
+					{
+						if (bIsParentSSP)
+						{
+							// this is a parent's SSP record that should not apply to subdomains
+							// the message is non-suspicious
+							iSSP = DKIM_SSP_UNKNOWN;
+							bTesting = false;
+							return DKIM_SUCCESS;
+						}
 					}
 					s = strtok(NULL, "|");
 				}
@@ -1428,6 +1471,7 @@ int CDKIMVerify::GetDetails( int* nSigCount, DKIMVerifyDetails** pDetails )
 		DKIMVerifyDetails d;
 		d.szSignature = (char*)i->Header.c_str();
 		d.nResult = i->Status;
+		d.szCanonicalizedData = (char*)i->CanonicalizedData.c_str();
 		Details.push_back(d);
 	}
 

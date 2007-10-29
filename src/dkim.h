@@ -19,6 +19,7 @@
 #define DKIM_CALL	WINAPI
 #else
 #define DKIM_CALL
+#define MAKELONG(a,b) ((long)(((unsigned)(a) & 0xffff) | (((unsigned)(b) & 0xffff) << 16)))
 #endif
 
 
@@ -55,7 +56,7 @@ extern "C" {
 #define DKIM_BUFFER_TOO_SMALL	5	// Buffer passed in is not large enough
 
 // DKIM Verification Error codes
-#define DKIM_FAIL							-1		// verify error: message does not pass policy
+#define DKIM_FAIL							-1		// verify error: message is suspicious
 #define DKIM_BAD_SYNTAX						-2		// signature error: DKIM-Signature could not parse or has bad tags/values
 #define DKIM_SIGNATURE_BAD					-3		// signature error: RSA verify failed
 #define DKIM_SIGNATURE_BAD_BUT_TESTING		-4		// signature error: RSA verify failed but testing
@@ -78,7 +79,7 @@ extern "C" {
 												// signature result: signature verified
 #define DKIM_FINISHED_BODY					1	// process result: no more message body is needed
 #define DKIM_PARTIAL_SUCCESS				2	// verify result: at least one but not all signatures verified
-#define DKIM_NEUTRAL  						3	// verify result: message passed because of policy rather than signing
+#define DKIM_NEUTRAL						3	// verify result: no signatures verified but message is not suspicous
 #define DKIM_SUCCESS_BUT_EXTRA				4	// signature result: signature verified but it did not include all of the body
 
 
@@ -122,16 +123,18 @@ typedef struct DKIMSignOptions_t
 typedef struct DKIMVerifyOptions_t
 {
 	DKIMDNSCALLBACK pfnSelectorCallback;	// selector record callback
-	DKIMDNSCALLBACK pfnPolicyCallback;		// policy record callback
+	DKIMDNSCALLBACK pfnPracticesCallback;	// SSP record callback
 	int nHonorBodyLengthTag;				// 0 = ignore l= tag, 1 = use l= tag to limit the amount of body verified
-	int nCheckPolicy;						// 0 = use default (signs some) policy, 1 = request and use sender's policy
+	int nCheckPractices;					// 0 = use default (unknown) practices, 1 = request and use sender's signing practices
 	int nSubjectRequired;					// 0 = subject is required to be signed, 1 = not required
+	int nSaveCanonicalizedData;             // 0 = canonicalized data is not saved, 1 = canonicalized data is saved
 } DKIMVerifyOptions;
 
 typedef struct DKIMVerifyDetails_t
 {
 	char *szSignature;
 	char *DNS;
+	char *szCanonicalizedData;
 	int nResult;
 } DKIMVerifyDetails;
 
@@ -149,7 +152,7 @@ void DKIM_CALL DKIMSignFree( DKIMContext* pSignContext );
 int DKIM_CALL DKIMVerifyInit( DKIMContext* pVerifyContext, DKIMVerifyOptions* pOptions );
 int DKIM_CALL DKIMVerifyProcess( DKIMContext* pVerifyContext, char* szBuffer, int nBufLength );
 int DKIM_CALL DKIMVerifyResults( DKIMContext* pVerifyContext );
-int DKIM_CALL DKIMVerifyGetDetails( DKIMContext* pVerifyContext, int* nSigCount, DKIMVerifyDetails** pDetails, char* szPolicy );
+int DKIM_CALL DKIMVerifyGetDetails( DKIMContext* pVerifyContext, int* nSigCount, DKIMVerifyDetails** pDetails, char* szPractices );
 void DKIM_CALL DKIMVerifyFree( DKIMContext* pVerifyContext );
 
 char *DKIM_CALL DKIMVersion();

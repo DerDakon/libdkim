@@ -21,6 +21,8 @@
 #else
 #define _strnicmp strncasecmp 
 #define _stricmp strcasecmp 
+#define LOWORD(l) ((unsigned)(l) & 0xffff)
+#define HIWORD(l) ((unsigned)(l) >> 16)
 #endif
 
 #include <string.h>

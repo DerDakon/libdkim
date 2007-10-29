@@ -193,18 +193,18 @@ int DKIM_CALL DKIMVerifyResults( DKIMContext* pVerifyContext )
 }
 
 
-int DKIM_CALL DKIMVerifyGetDetails( DKIMContext* pVerifyContext, int* nSigCount, DKIMVerifyDetails** pDetails, char* szPolicy )
+int DKIM_CALL DKIMVerifyGetDetails( DKIMContext* pVerifyContext, int* nSigCount, DKIMVerifyDetails** pDetails, char* szPractices )
 {
-	szPolicy[0] = '\0';
+	szPractices[0] = '\0';
 
 	CDKIMVerify* pVerify = (CDKIMVerify*)ValidateContext( pVerifyContext, false );
 
 	if( pVerify )
 	{
-		strcpy(szPolicy, pVerify->GetPolicy());
+		strcpy(szPractices, pVerify->GetPractices());
 		return pVerify->GetDetails(nSigCount, pDetails);
 	}
-	
+
 	return DKIM_INVALID_CONTEXT;
 }
 
