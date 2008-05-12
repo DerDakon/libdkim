@@ -7,11 +7,15 @@
 *
 *      http://www.apache.org/licenses/LICENSE-2.0 
 *
+*  This code incorporates intellectual property owned by Yahoo! and licensed 
+*  pursuant to the Yahoo! DomainKeys Patent License Agreement.
+*
 *  Unless required by applicable law or agreed to in writing, software 
 *  distributed under the License is distributed on an "AS IS" BASIS, 
 *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
 *  See the License for the specific language governing permissions and 
 *  limitations under the License.
+*
 *****************************************************************************/
 
 #ifdef WIN32
@@ -26,6 +30,8 @@
 #include "dkimverify.h"
 #include "dns.h"
 
+#include <string.h>
+#include <ctype.h>
 #include <assert.h>
 #include <vector>
 #include <algorithm>
@@ -41,6 +47,8 @@ SignatureInfo::SignatureInfo(bool s)
 	EVP_MD_CTX_init( &m_Bdy_ctx );
 	m_pSelector = NULL;
 	Status = DKIM_SUCCESS;
+	m_nHash = 0;
+	EmptyLineCount = 0;
 	m_SaveCanonicalizedData = s;
 }
 
@@ -220,7 +228,7 @@ unsigned DecodeBase64(char *ptr)
 	while (*s != '\0')
 	{
 		unsigned char value = base64_table[*s++];
-		if ( (char)value >= 0 )
+		if ( (signed char)value >= 0 )
 		{
 			b64accum = (b64accum << 6) | value;
 			b64shift += 6;
@@ -479,29 +487,15 @@ int CDKIMVerify::GetResults(void)
 
 			// check the header hash
 			string sSignedSig = i->Header;
+			string sSigValue = sSignedSig.substr( sSignedSig.find(':')+1 );
 
-			unsigned bpos = sSignedSig.find("b=", 15, 2);	// 15 is the length of "DKIM-Signature:"
-			if (bpos != -1)
-			{
-				// skip backwards over whitespace and look for a ';'
-				// if not found, we're in some other tag's value so keep looking
-				do  {
-					unsigned pos = bpos;
-					while (pos > 15 && isswsp(sSignedSig[pos-1]))
-						pos--;
-					if (pos == 15 || sSignedSig[pos-1] == ';')
-						break;
-					bpos = sSignedSig.find("b=", bpos+2, 2);
-				} while (bpos != -1);
-			}
+			static const char *tags[] = {"b",NULL};
+			char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
 
-			if (bpos != -1)
+			char *pSigValue = (char *) sSigValue.c_str();
+			if (ParseTagValueList(pSigValue, tags, values) && values[0] != NULL)
 			{
-				unsigned epos = sSignedSig.find(';', bpos+2);
-				if (epos == -1)
-					sSignedSig.erase(bpos+2);
-				else
-					sSignedSig.erase(bpos+2, epos-bpos-2);
+				sSignedSig.erase( 15+values[0]-pSigValue, strlen(values[0]) );
 			}
 
 			if ( i->HeaderCanonicalization == DKIM_CANON_RELAXED )
@@ -560,14 +554,21 @@ int CDKIMVerify::GetResults(void)
 	{
 		for (list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i)
 		{
-			if (_strnicmp(i->c_str(), "From:", 5) == 0)
+			if (_strnicmp(i->c_str(), "From", 4) == 0)
 			{
-				vector<string> Addresses;
-				if (ParseAddresses(i->substr(5), Addresses))
+				// skip over whitespace between the header name and :
+				const char *s = i->c_str()+4;
+				while (*s == ' ' || *s == '\t')
+					s++;
+				if (*s == ':')
 				{
-					unsigned atpos = Addresses[0].find('@');
-					sFromDomain = Addresses[0].substr(atpos+1);
-					break;
+					vector<string> Addresses;
+					if (ParseAddresses(s+1, Addresses))
+					{
+						unsigned atpos = Addresses[0].find('@');
+						sFromDomain = Addresses[0].substr(atpos+1);
+						break;
+					}
 				}
 			}
 		}
@@ -684,11 +685,22 @@ int CDKIMVerify::ProcessHeaders(void)
 	// look for DKIM-Signature header(s)
 	for( list<string>::iterator i = HeaderList.begin(); i != HeaderList.end(); ++i )
 	{
-		if( _strnicmp(i->c_str(), "DKIM-Signature:", 15 ) == 0 && Signatures.size() < MAX_SIGNATURES )
+		if( _strnicmp(i->c_str(), "DKIM-Signature", 14 ) == 0 )
 		{
-			SignatureInfo sig(m_SaveCanonicalizedData);
-			sig.Status = ParseDKIMSignature( *i, sig );
-			Signatures.push_back( sig );
+			// skip over whitespace between the header name and :
+			const char *s = i->c_str()+14;
+			while (*s == ' ' || *s == '\t')
+				s++;
+			if (*s == ':')
+			{
+				// found
+				SignatureInfo sig(m_SaveCanonicalizedData);
+				sig.Status = ParseDKIMSignature( *i, sig );
+				Signatures.push_back( sig );
+
+				if (Signatures.size() >= MAX_SIGNATURES)
+					break;
+			}
 		}
 	}
 
@@ -846,8 +858,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 	// save header for later
 	sig.Header = sHeader;
 
-	// extract value (15 is the length of "DKIM-Signature:")
-	string sValue = sHeader.substr(15);
+	string sValue = sHeader.substr( sHeader.find(':')+1 );
 
 	static const char *tags[] = {"v","a","b","d","h","s","c","i","l","q","t","x","bh",NULL};
 	char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
@@ -1096,7 +1107,7 @@ int CDKIMVerify::ParseDKIMSignature( const string& sHeader, SignatureInfo &sig )
 // ProcessBody - Process message body data
 //
 ////////////////////////////////////////////////////////////////////////////////
-int CDKIMVerify::ProcessBody( char* szBuffer, int nBufLength )
+int CDKIMVerify::ProcessBody( char* szBuffer, int nBufLength, bool bEOF )
 {
 	bool MoreBodyNeeded = false;
 
@@ -1106,14 +1117,39 @@ int CDKIMVerify::ProcessBody( char* szBuffer, int nBufLength )
 		{
 			if ( i->BodyCanonicalization == DKIM_CANON_SIMPLE )
 			{
-				i->Hash( szBuffer, nBufLength, true );
-				i->Hash( "\r\n", 2, true );
+				if (nBufLength > 0)
+				{
+					while (i->EmptyLineCount > 0)
+					{
+						i->Hash( "\r\n", 2, true );
+						i->EmptyLineCount--;
+					}
+					i->Hash( szBuffer, nBufLength, true );
+					i->Hash( "\r\n", 2, true );
+				}
+				else
+				{
+					i->EmptyLineCount++;
+					if (bEOF)
+						i->Hash( "\r\n", 2, true);
+				}
 			}
 			else if ( i->BodyCanonicalization == DKIM_CANON_RELAXED )
 			{
 				CompressSWSP( szBuffer, nBufLength );
-				i->Hash( szBuffer, nBufLength, true );
-				i->Hash( "\r\n", 2, true);
+				if (nBufLength > 0)
+				{
+					while (i->EmptyLineCount > 0)
+					{
+						i->Hash( "\r\n", 2, true );
+						i->EmptyLineCount--;
+					}
+					i->Hash( szBuffer, nBufLength, true );
+					if ( !bEOF )
+						i->Hash( "\r\n", 2, true);
+				}
+				else
+					i->EmptyLineCount++;
 			}
 			else if ( i->BodyCanonicalization == DKIM_CANON_NOWSP )
 			{

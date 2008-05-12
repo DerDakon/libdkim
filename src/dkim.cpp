@@ -7,11 +7,15 @@
 *
 *      http://www.apache.org/licenses/LICENSE-2.0 
 *
+*  This code incorporates intellectual property owned by Yahoo! and licensed 
+*  pursuant to the Yahoo! DomainKeys Patent License Agreement.
+*
 *  Unless required by applicable law or agreed to in writing, software 
 *  distributed under the License is distributed on an "AS IS" BASIS, 
 *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
 *  See the License for the specific language governing permissions and 
 *  limitations under the License.
+*
 *****************************************************************************/
 
 #ifdef WIN32
@@ -24,6 +28,7 @@
 #include "dkimsign.h"
 #include "dkimverify.h"
 #include "resource.h"
+#include <string.h>
 
 #define DKIMID ('D' | 'K'<<8 | 'I'<<16 | 'M'<<24)
 
@@ -99,7 +104,7 @@ int DKIM_CALL DKIMSignProcess( DKIMContext* pSignContext, char* szBuffer, int nB
 
 	if( pSign )
 	{
-		return pSign->Process( szBuffer, nBufLength );
+		return pSign->Process( szBuffer, nBufLength, false );
 	}
 	
 	return DKIM_INVALID_CONTEXT;
@@ -173,7 +178,7 @@ int DKIM_CALL DKIMVerifyProcess( DKIMContext* pVerifyContext, char* szBuffer, in
 
 	if( pVerify )
 	{
-		return pVerify->Process( szBuffer, nBufLength );
+		return pVerify->Process( szBuffer, nBufLength, false );
 	}
 	
 	return DKIM_INVALID_CONTEXT;

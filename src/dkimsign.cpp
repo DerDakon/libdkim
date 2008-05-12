@@ -7,11 +7,15 @@
 *
 *      http://www.apache.org/licenses/LICENSE-2.0 
 *
+*  This code incorporates intellectual property owned by Yahoo! and licensed 
+*  pursuant to the Yahoo! DomainKeys Patent License Agreement.
+*
 *  Unless required by applicable law or agreed to in writing, software 
 *  distributed under the License is distributed on an "AS IS" BASIS, 
 *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
 *  See the License for the specific language governing permissions and 
 *  limitations under the License.
+*
 *****************************************************************************/
 
 #ifdef WIN32
@@ -34,6 +38,7 @@
 
 CDKIMSign::CDKIMSign()
 {
+	m_EmptyLineCount = 0;
 	m_pfnHdrCallback = NULL;
 
 	EVP_SignInit( &m_allman_sha1ctx, EVP_sha1() );
@@ -88,7 +93,7 @@ int CDKIMSign::Init( DKIMSignOptions* pOptions )
 	m_nIncludeTimeStamp = pOptions->nIncludeTimeStamp;
 	m_nIncludeQueryMethod = pOptions->nIncludeQueryMethod;
 	m_nIncludeCopiedHeaders = pOptions->nIncludeCopiedHeaders;
-	m_nIncludeBodyHash = pOptions->nIncludeBodyHash;					
+	m_nIncludeBodyHash = pOptions->nIncludeBodyHash;
 
 	// NOTE: the following line is not backwards compatible with MD 8.0.3
 	// because the szRequiredHeaders member was added after the release
@@ -425,30 +430,63 @@ void CDKIMSign::ProcessHeader( const string& sHdr )
 }
 
 
-int CDKIMSign::ProcessBody( char* szBuffer, int nBufLength )
+int CDKIMSign::ProcessBody( char* szBuffer, int nBufLength, bool bEOF )
 {
 	switch( LOWORD( m_Canon ) )
 	{
 	case DKIM_CANON_SIMPLE:
 		if( nBufLength > 0 )
+		{
+			while( m_EmptyLineCount > 0 )
+			{
+				Hash( "\r\n", 2, false );
+				m_nBodyLength += 2;
+				m_EmptyLineCount--;
+			}
 			Hash( szBuffer, nBufLength, false );
-		Hash( "\r\n", 2, false );
-		m_nBodyLength += nBufLength + 2;
+			Hash( "\r\n", 2, false );
+			m_nBodyLength += nBufLength + 2;
+		}
+		else
+		{
+			m_EmptyLineCount++;
+			if( bEOF )
+			{
+				Hash( "\r\n", 2, false );
+				m_nBodyLength += 2;
+			}
+		}
 		break;
 
 	case DKIM_CANON_NOWSP:
 		RemoveSWSP( szBuffer, nBufLength );
 		if( nBufLength > 0 )
+		{
 			Hash( szBuffer, nBufLength, false );
-		m_nBodyLength += nBufLength;
+			m_nBodyLength += nBufLength;
+		}
 		break;
 
 	case DKIM_CANON_RELAXED:
 		CompressSWSP( szBuffer, nBufLength );
 		if( nBufLength > 0 )
+		{
+			while( m_EmptyLineCount > 0 )
+			{
+				Hash( "\r\n", 2, false );
+				m_nBodyLength += 2;
+				m_EmptyLineCount--;
+			}
 			Hash( szBuffer, nBufLength, false );
-		Hash( "\r\n", 2, false );
-		m_nBodyLength += nBufLength + 2;
+			m_nBodyLength += nBufLength;
+			if ( !bEOF )
+			{
+				Hash( "\r\n", 2, false );
+				m_nBodyLength += 2;
+			}
+		}
+		else
+			m_EmptyLineCount++;
 		break;
 	}
 

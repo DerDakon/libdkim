@@ -1,3 +1,22 @@
+/*****************************************************************************
+*  Copyright 2005 Alt-N Technologies, Ltd. 
+*
+*  Licensed under the Apache License, Version 2.0 (the "License"); 
+*  you may not use this file except in compliance with the License. 
+*  You may obtain a copy of the License at 
+*
+*      http://www.apache.org/licenses/LICENSE-2.0 
+*
+*  This code incorporates intellectual property owned by Yahoo! and licensed 
+*  pursuant to the Yahoo! DomainKeys Patent License Agreement.
+*
+*  Unless required by applicable law or agreed to in writing, software 
+*  distributed under the License is distributed on an "AS IS" BASIS, 
+*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+*  See the License for the specific language governing permissions and 
+*  limitations under the License.
+*
+*****************************************************************************/
 
 #ifdef WIN32
 #include <windows.h>
@@ -14,6 +33,12 @@
 #include "dns.h"
 
 
+// change these to your selector name, domain name, etc
+#define MYSELECTOR	"MDaemon"
+#define MYDOMAIN	"bardenhagen.com"
+#define MYIDENTITY	"dkimtest@bardenhagen.com"
+
+
 int DKIM_CALL SignThisHeader(const char* szHeader)
 {
 	if( strnicmp( szHeader, "X-", 2 ) == 0 )
@@ -26,11 +51,6 @@ int DKIM_CALL SignThisHeader(const char* szHeader)
 
 
 int DKIM_CALL SelectorCallback(const char* szFQDN, char* szBuffer, int nBufLen )
-{
-	return 0;
-}
-
-int DKIM_CALL PolicyCallback(const char* szFQDN, char* szBuffer, int nBufLen )
 {
 	return 0;
 }
@@ -50,7 +70,7 @@ int main(int argc, char* argv[])
 	char szSignature[10024];
 	time_t t;
 	DKIMContext ctxt;
-	DKIMSignOptions opts;
+	DKIMSignOptions opts = {0};
 
 	opts.nHash = DKIM_HASH_SHA1_AND_256;
 
@@ -61,9 +81,9 @@ int main(int argc, char* argv[])
 	opts.nIncludeQueryMethod = 0;
 	opts.nIncludeTimeStamp = 0;
 	opts.expireTime = t + 604800;		// expires in 1 week
-	strcpy( opts.szSelector, "MDaemon" );
-	strcpy( opts.szDomain, "bardenhagen.com" );
-	strcpy( opts.szIdentity, "dkimtest@bardenhagen.com" );
+	strcpy( opts.szSelector, MYSELECTOR );
+	strcpy( opts.szDomain, MYDOMAIN );
+	strcpy( opts.szIdentity, MYIDENTITY );
 	opts.pfnHeaderCallback = SignThisHeader;
 	strcpy( opts.szRequiredHeaders, "NonExistant" );
 	opts.nIncludeCopiedHeaders = 0;
@@ -254,9 +274,8 @@ int main(int argc, char* argv[])
 	{
 		FILE* in = fopen( MsgFile, "rb" );
 
-		DKIMVerifyOptions vopts;
+		DKIMVerifyOptions vopts = {0};
 		vopts.pfnSelectorCallback = NULL; //SelectorCallback;
-		vopts.pfnPolicyCallback = NULL; //PolicyCallback;
 
 		n = DKIMVerifyInit( &ctxt, &vopts );
 

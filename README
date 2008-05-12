@@ -1,5 +1,29 @@
 Alt-N DKIM Open Source Project
-Copyright 2007 Alt-N Technologies, Ltd.
+Copyright 2008 Alt-N Technologies, Ltd.
+
+This code incorporates intellectual property owned by Yahoo! and licensed 
+pursuant to the Yahoo! DomainKeys Patent License Agreement.
+
+By making, using, selling, offering for sale, importing, and/or sublicensing 
+Implementations as permitted, you agree to the terms and conditions of the 
+Yahoo! DomainKeys Patent License Agreement or other agreement contained herein.
+
+----------------------
+1.0.19 May 12, 2008
+----------------------
+
+  o fix to trailing lines of whitespace not being ignored
+    with relaxed body canonicalization
+
+----------------------
+1.0.18 January 9, 2008
+----------------------
+
+  o fix to incorrect body hashes for empty bodies
+  o fix to verification error for signatures with whitespace
+    around the b= value
+  o more fixes to verification errors with whitespace between
+    the header name and :
 
 -----------------------
 1.0.17 October 29, 2007

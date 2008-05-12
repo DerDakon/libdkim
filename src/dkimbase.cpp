@@ -7,11 +7,15 @@
 *
 *      http://www.apache.org/licenses/LICENSE-2.0 
 *
+*  This code incorporates intellectual property owned by Yahoo! and licensed 
+*  pursuant to the Yahoo! DomainKeys Patent License Agreement.
+*
 *  Unless required by applicable law or agreed to in writing, software 
 *  distributed under the License is distributed on an "AS IS" BASIS, 
 *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
 *  See the License for the specific language governing permissions and 
 *  limitations under the License.
+*
 *****************************************************************************/
 
 #ifdef WIN32
@@ -39,7 +43,6 @@ CDKIMBase::CDKIMBase()
 	m_LineSize = 0;
 	m_LinePos = 0;
 	m_InHeaders = true;
-	m_EmptyLineCount = 0;
 }
 
 CDKIMBase::~CDKIMBase()
@@ -115,7 +118,7 @@ void CDKIMBase::Free( char* szBuffer )
 // Process - split buffers into lines without any CRs or LFs at the end.
 //
 ////////////////////////////////////////////////////////////////////////////////
-int CDKIMBase::Process( char* szBuffer, int nBufLength )
+int CDKIMBase::Process( char* szBuffer, int nBufLength, bool bEOF )
 {
 	char* p = szBuffer;
 	char* e = szBuffer + nBufLength;
@@ -138,40 +141,17 @@ int CDKIMBase::Process( char* szBuffer, int nBufLength )
 			// back up past the CR
 			m_LinePos--;
 
-			if( m_LinePos == 0 )
+			if (m_InHeaders)
 			{
-				// empty line found.  count it but do not process it
-				m_EmptyLineCount++;
-			}
-			else
-			{
-				// non-empty line found.  process any pending empty lines
-				while( m_EmptyLineCount > 0 )
+				// process header line
+				if (m_LinePos == 0)
 				{
-					int Result;
-
-					if( m_InHeaders )
-					{
-						m_InHeaders = false;
-						Result = ProcessHeaders();
-					}
-					else
-					{
-						Result = ProcessBody("", 0);
-					}
-
+					m_InHeaders = false;
+					int Result = ProcessHeaders();
 					if (Result != DKIM_SUCCESS)
-					{
-						m_EmptyLineCount = 0;
-						m_LinePos = 0;
 						return Result;
-					}
-
-					m_EmptyLineCount--;
 				}
-
-				// process the current line
-				if( m_InHeaders )
+				else
 				{
 					// append the header to the headers list
 					if ( m_Line[0] != ' ' && m_Line[0] != '\t' )
@@ -190,18 +170,19 @@ int CDKIMBase::Process( char* szBuffer, int nBufLength )
 						}
 					}
 				}
-				else
-				{
-					int Result = ProcessBody(m_Line, m_LinePos);
-					if (Result != DKIM_SUCCESS)
-					{
-						m_LinePos = 0;
-						return Result;
-					}
-				}
-
-				m_LinePos = 0;
 			}
+			else
+			{
+				// process body line
+				int Result = ProcessBody(m_Line, m_LinePos, bEOF);
+				if (Result != DKIM_SUCCESS)
+				{
+					m_LinePos = 0;
+					return Result;
+				}
+			}
+
+			m_LinePos = 0;
 		}
 
 		p++;
@@ -220,14 +201,14 @@ int CDKIMBase::ProcessFinal(void)
 {
 	if ( m_LinePos > 0 )
 	{
-		Process( "\r\n", 2 );
+		Process( "\r\n", 2, true );
 	}
 
 	if( m_InHeaders )
 	{
 		m_InHeaders = false;
 		ProcessHeaders();
-		ProcessBody("", 0);
+		ProcessBody("", 0, true);
 	}
 
 	return DKIM_SUCCESS;
@@ -250,7 +231,7 @@ int CDKIMBase::ProcessHeaders()
 // ProcessBody - process body line (to be implemented by derived class)
 //
 ////////////////////////////////////////////////////////////////////////////////
-int CDKIMBase::ProcessBody( char* szBuffer, int nBufLength )
+int CDKIMBase::ProcessBody( char* szBuffer, int nBufLength, bool bEOF )
 {
 	return DKIM_SUCCESS;
 }
@@ -369,17 +350,15 @@ string CDKIMBase::RelaxHeader( const string& sHeader )
 		for (unsigned i=0; i<cpos; i++)
 		{
 			if (sTemp[i] >= 'A' && sTemp[i] <= 'Z')
-			{
 				sTemp[i] += 'a'-'A';
-			}
 		}
 
 		// remove the space after the :
-		if (sTemp.length() > cpos && isswsp()(sTemp[cpos+1]))
+		if (cpos+1 < sTemp.length() && sTemp[cpos+1] == ' ')
 			sTemp.erase(cpos+1, 1);
 
 		// remove the space before the :
-		if (cpos > 0 && isswsp()(sTemp[cpos-1]))
+		if (cpos > 0 && sTemp[cpos-1] == ' ')
 			sTemp.erase(cpos-1, 1);
 	}
 

@@ -7,11 +7,15 @@
 *
 *      http://www.apache.org/licenses/LICENSE-2.0 
 *
+*  This code incorporates intellectual property owned by Yahoo! and licensed 
+*  pursuant to the Yahoo! DomainKeys Patent License Agreement.
+*
 *  Unless required by applicable law or agreed to in writing, software 
 *  distributed under the License is distributed on an "AS IS" BASIS, 
 *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
 *  See the License for the specific language governing permissions and 
 *  limitations under the License.
+*
 *****************************************************************************/
 
 #ifndef DKIMVERIFY_H
@@ -85,6 +89,7 @@ public:
 
 	int Status;
 	int m_nHash;						// use one of the DKIM_HASH_xxx constants here
+	unsigned EmptyLineCount;
 	bool m_SaveCanonicalizedData;
 };
 
@@ -101,7 +106,7 @@ public:
 	int GetDetails( int* nSigCount, DKIMVerifyDetails** pDetails );
 
 	virtual int ProcessHeaders(void);
-	virtual int ProcessBody( char* szBuffer, int nBufLength );
+	virtual int ProcessBody( char* szBuffer, int nBufLength, bool bEOF );
 
 	const char* GetPractices() { return Practices.c_str(); }
 
