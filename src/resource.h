@@ -5,10 +5,10 @@
 
 #define VER_MAJOR 1
 #define VER_MINOR 0
-#define VER_REV   19
+#define VER_REV   21
 #define VER_BUILD 0
 
-#define VERSION_STRING "1.0.19"
+#define VERSION_STRING "1.0.21"
 
 #define IDS_PROJNAME                    100
 #define IDR_WMDMLOGGER                  101

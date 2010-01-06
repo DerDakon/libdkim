@@ -398,6 +398,7 @@ CDKIMVerify::CDKIMVerify()
 	m_CheckPractices = false;
 	m_SubjectIsRequired = true;
 	m_SaveCanonicalizedData = false;
+	m_AllowUnsignedFromHeaders = false;
 }
 
 CDKIMVerify::~CDKIMVerify()
@@ -427,6 +428,7 @@ int CDKIMVerify::Init( DKIMVerifyOptions* pOptions )
 	m_CheckPractices = pOptions->nCheckPractices != 0;
 	m_SubjectIsRequired = pOptions->nSubjectRequired == 0;
 	m_SaveCanonicalizedData = pOptions->nSaveCanonicalizedData != 0;
+	m_AllowUnsignedFromHeaders = pOptions->nAllowUnsignedFromHeaders != 0;
 
 	return nRet;
 }
@@ -575,7 +577,7 @@ int CDKIMVerify::GetResults(void)
 	}
 
 	// if a signature from the From domain verified successfully, return success now
-	// without checking the sender signing practices
+	// without checking the author domain signing practices
 	if (SuccessCount > 0 && !sFromDomain.empty())
 	{
 		for (list<string>::iterator i = SuccessfulDomains.begin(); i != SuccessfulDomains.end(); ++i)
@@ -592,31 +594,26 @@ int CDKIMVerify::GetResults(void)
 		}
 	}
 
-	// get the sender signing practices
-	int iPractices = DKIM_SSP_UNKNOWN;
-	bool bTestingPractices = false;
+	// get the author domain signing practices
+	int iPractices = DKIM_ADSP_UNKNOWN;
 
 	if (m_CheckPractices && !sFromDomain.empty())
 	{
-		int SSPStatus = GetSSP(sFromDomain, iPractices, bTestingPractices);
-		if (SSPStatus != DKIM_SUCCESS)
+		int ADSPStatus = GetADSP(sFromDomain, iPractices);
+		if (ADSPStatus != DKIM_SUCCESS)
 		{
 			// could not get practices, leave values at the defaults
 		}
 	}
 
-	// if there was a successful third-party signature and third-party signatures are allowed, return success
-	if (SuccessCount > 0 && (iPractices == DKIM_SSP_UNKNOWN || iPractices == DKIM_SSP_ALL))
+	// if there was a successful signature and policy is not discardable, return success
+	if (SuccessCount > 0 && (iPractices == DKIM_ADSP_UNKNOWN || iPractices == DKIM_ADSP_ALL))
 	{
 		return SuccessCount == Signatures.size() ? DKIM_SUCCESS : DKIM_PARTIAL_SUCCESS;
 	}
 
-	// if the SSP is testing, return neutral
-	if (bTestingPractices)
-		return DKIM_NEUTRAL;
-
 	// if the message should be signed, return fail
-	if (iPractices == DKIM_SSP_ALL || iPractices == DKIM_SSP_STRICT)
+	if (iPractices == DKIM_ADSP_ALL || iPractices == DKIM_ADSP_DISCARDABLE)
 		return DKIM_FAIL;
 
 	// return neutral for everything else
@@ -808,6 +805,37 @@ int CDKIMVerify::ProcessHeaders(void)
 		{
 			// hash CRLF separating headers from body
 			sig.Hash( "\r\n", 2 );
+		}
+
+		if (!m_AllowUnsignedFromHeaders)
+		{
+			// make sure the message has no unsigned From headers
+			list<string>::reverse_iterator i;
+			for( i = HeaderList.rbegin(); i != HeaderList.rend(); ++i )
+			{
+				if( _strnicmp(i->c_str(), "From", 4 ) == 0 )
+				{
+					// skip over whitespace between the header name and :
+					const char *s = i->c_str()+4;
+					while (*s == ' ' || *s == '\t')
+						s++;
+					if (*s == ':')
+					{
+						if (find(used.begin(), used.end(), i) == used.end())
+						{
+							// this From header was not signed
+							break;
+						}
+					}
+				}
+			}
+
+			if (i != HeaderList.rend())
+			{
+				// treat signature as invalid
+				sig.Status = DKIM_UNSIGNED_FROM;
+				continue;
+			}
 		}
 
 		ValidSigFound = true;
@@ -1383,19 +1411,18 @@ SelectorInfo &CDKIMVerify::GetSelector( const string &sSelector, const string &s
 
 ////////////////////////////////////////////////////////////////////////////////
 // 
-// GetSSP - Get DKIM Sender Signing Practices for a domain
+// GetADSP - Get DKIM Author Domain Signing Practices for a domain
 //
 ////////////////////////////////////////////////////////////////////////////////
-int CDKIMVerify::GetSSP( const string &sDomain, int &iSSP, bool &bTesting )
+int CDKIMVerify::GetADSP( const string &sDomain, int &iADSP )
 {
-	string sFQDN = "_ssp._domainkey.";
+	string sFQDN = "_adsp._domainkey.";
 	sFQDN += sDomain;
 
 	char Buffer[1024];
 	int BufLen = 1024;
 
 	int DNSResult;
-	bool bIsParentSSP = false;
 
 	if ( m_pfnPracticesCallback )
 		DNSResult = m_pfnPracticesCallback( sFQDN.c_str(), Buffer, BufLen );
@@ -1405,27 +1432,11 @@ int CDKIMVerify::GetSSP( const string &sDomain, int &iSSP, bool &bTesting )
 
 		if (DNSResult != DNSRESP_SUCCESS)
 		{
-			DNSResult = DNSGetTXT( sDomain.c_str(), Buffer, BufLen );
-			if (DNSResult == DNSRESP_NXDOMAIN)
+			int DomainDNSResult = DNSGetTXT( sDomain.c_str(), Buffer, BufLen );
+			if (DomainDNSResult == DNSRESP_NXDOMAIN)
 			{
-				return DKIM_POLICY_DNS_PERM_FAILURE;
+				return DKIM_POLICY_DNS_PERM_FAILURE;	// TODO: new error indicating domain is out of scope?
 			}
-
-			unsigned pos = sDomain.find('.');
-			if (pos == -1 || sDomain.find('.', pos+1) == -1)
-			{
-				// SSP not found but the domain exists, it's non-suspicious
-				iSSP = DKIM_SSP_UNKNOWN;
-				bTesting = false;
-				return DKIM_SUCCESS;
-			}
-
-			DNSResult = DNSGetTXT( sDomain.substr(pos+1).c_str(), Buffer, BufLen );
-			if (DNSResult != DNSRESP_SUCCESS)
-			{
-				return DNSRESP_PERM_FAIL;
-			}
-			bIsParentSSP = true;
 		}
 	}
 
@@ -1435,47 +1446,20 @@ int CDKIMVerify::GetSSP( const string &sDomain, int &iSSP, bool &bTesting )
 		{
 			Practices = Buffer;
 
-			static const char *tags[] = {"dkim","t",NULL};
+			static const char *tags[] = {"dkim",NULL};
 			char *values[sizeof(tags)/sizeof(tags[0])] = {NULL};
 
 			if (!ParseTagValueList(Buffer, tags, values))
 				return DKIM_POLICY_INVALID;
 
 			// practices
-			iSSP = DKIM_SSP_UNKNOWN;
+			iADSP = DKIM_ADSP_UNKNOWN;
 			if (values[0] != NULL)
 			{
 				if (strcmp(values[0], "all") == 0)
-					iSSP = DKIM_SSP_ALL;
-				else if (strcmp(values[0], "strict") == 0)
-					iSSP = DKIM_SSP_STRICT;
-			}
-
-			bTesting = false;
-
-			// flags
-			if (values[1] != NULL)
-			{
-				char *s = strtok(values[1], "|");
-				while (s != NULL)
-				{
-					if (strcmp(s, "y") == 0)
-					{
-						bTesting = true;
-					}
-					else if (strcmp(s, "s") == 0)
-					{
-						if (bIsParentSSP)
-						{
-							// this is a parent's SSP record that should not apply to subdomains
-							// the message is non-suspicious
-							iSSP = DKIM_SSP_UNKNOWN;
-							bTesting = false;
-							return DKIM_SUCCESS;
-						}
-					}
-					s = strtok(NULL, "|");
-				}
+					iADSP = DKIM_ADSP_ALL;
+				else if (strcmp(values[0], "discardable") == 0)
+					iADSP = DKIM_ADSP_DISCARDABLE;
 			}
 		}
 		return DKIM_SUCCESS;
@@ -1506,8 +1490,10 @@ int CDKIMVerify::GetDetails( int* nSigCount, DKIMVerifyDetails** pDetails )
 	{
 		DKIMVerifyDetails d;
 		d.szSignature = (char*)i->Header.c_str();
-		d.nResult = i->Status;
+		d.szSignatureDomain = (char*)i->Domain.c_str();
+		d.szIdentityDomain = (char*)i->IdentityDomain.c_str();
 		d.szCanonicalizedData = (char*)i->CanonicalizedData.c_str();
+		d.nResult = i->Status;
 		Details.push_back(d);
 	}
 

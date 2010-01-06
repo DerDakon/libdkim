@@ -24,9 +24,9 @@
 #include "dkimbase.h"
 #include <vector>
 
-#define DKIM_SSP_UNKNOWN			1
-#define DKIM_SSP_ALL				2
-#define DKIM_SSP_STRICT				3
+#define DKIM_ADSP_UNKNOWN			1
+#define DKIM_ADSP_ALL				2
+#define DKIM_ADSP_DISCARDABLE		3
 
 #define DKIM_POLICY_DOMAIN_NAME_TOO_LONG	-50		// internal error
 #define DKIM_POLICY_DNS_TEMP_FAILURE		-51		// internal error
@@ -116,18 +116,19 @@ protected:
 
 	SelectorInfo& GetSelector( const string &sSelector, const string &sDomain );
 
-	int GetSSP( const string &sDomain, int &iSSP, bool &bTesting );
+	int GetADSP( const string &sDomain, int &iADSP );
 
 	list<SignatureInfo> Signatures;
 	list<SelectorInfo> Selectors;
 
 	DKIMDNSCALLBACK m_pfnSelectorCallback;		// selector record callback
-	DKIMDNSCALLBACK m_pfnPracticesCallback;		// SSP record callback
+	DKIMDNSCALLBACK m_pfnPracticesCallback;		// ADSP record callback
 
 	bool m_HonorBodyLengthTag;
 	bool m_CheckPractices;
 	bool m_SubjectIsRequired;
 	bool m_SaveCanonicalizedData;
+	bool m_AllowUnsignedFromHeaders;
 
 	vector<DKIMVerifyDetails> Details;
 	string Practices;
