@@ -148,13 +148,13 @@ typedef struct DKIMVerifyDetails_t
 #endif
 
 int DKIM_CALL DKIMSignInit( DKIMContext* pSignContext, DKIMSignOptions* pOptions );
-int DKIM_CALL DKIMSignProcess( DKIMContext* pSignContext, char* szBuffer, int nBufLength );
+int DKIM_CALL DKIMSignProcess( DKIMContext* pSignContext, const char* szBuffer, int nBufLength );
 int DKIM_CALL DKIMSignGetSig( DKIMContext* pSignContext, char* szPrivKey, char* szSignature, int nSigLength );
 int DKIM_CALL DKIMSignGetSig2( DKIMContext* pSignContext, char* szPrivKey, char** pszSignature );
 void DKIM_CALL DKIMSignFree( DKIMContext* pSignContext );
 
 int DKIM_CALL DKIMVerifyInit( DKIMContext* pVerifyContext, DKIMVerifyOptions* pOptions );
-int DKIM_CALL DKIMVerifyProcess( DKIMContext* pVerifyContext, char* szBuffer, int nBufLength );
+int DKIM_CALL DKIMVerifyProcess( DKIMContext* pVerifyContext, const char* szBuffer, int nBufLength );
 int DKIM_CALL DKIMVerifyResults( DKIMContext* pVerifyContext );
 int DKIM_CALL DKIMVerifyGetDetails( DKIMContext* pVerifyContext, int* nSigCount, DKIMVerifyDetails** pDetails, char* szPractices );
 void DKIM_CALL DKIMVerifyFree( DKIMContext* pVerifyContext );

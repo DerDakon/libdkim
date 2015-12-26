@@ -555,7 +555,7 @@ void CDKIMSign::InitSig(void)
 //               if bFold, fold at cbrk char
 //
 ////////////////////////////////////////////////////////////////////////////////
-void CDKIMSign::AddTagToSig( char* Tag, const string &sValue, char cbrk, bool bFold )
+void CDKIMSign::AddTagToSig( const char* Tag, const string &sValue, char cbrk, bool bFold )
 {
 	int nTagLen = strlen(Tag);
 
@@ -583,7 +583,7 @@ void CDKIMSign::AddTagToSig( char* Tag, const string &sValue, char cbrk, bool bF
 // AddTagToSig - add tag and numeric value to signature folding if necessary
 //
 ////////////////////////////////////////////////////////////////////////////////
-void CDKIMSign::AddTagToSig( char* Tag, unsigned long nValue )
+void CDKIMSign::AddTagToSig( const char* Tag, unsigned long nValue )
 {
 	char szValue[64];
 	sprintf( szValue, "%u", nValue );

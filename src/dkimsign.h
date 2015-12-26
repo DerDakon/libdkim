@@ -50,8 +50,8 @@ protected:
 	bool ParseFromAddress( void );
 
 	void InitSig(void);
-	void AddTagToSig( char* Tag, const string &sValue, char cbrk, bool bFold );
-	void AddTagToSig( char* Tag, unsigned long nValue );
+	void AddTagToSig( const char* Tag, const string &sValue, char cbrk, bool bFold );
+	void AddTagToSig( const char* Tag, unsigned long nValue );
 	void AddInterTagSpace( int nSizeOfNextTag );
 	void AddFoldedValueToSig( const string &sValue, char cbrk );
 
