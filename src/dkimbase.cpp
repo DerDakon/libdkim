@@ -333,16 +333,16 @@ string CDKIMBase::RelaxHeader( const string& sHeader )
 
 	CompressSWSP(sTemp);
 
-	unsigned cpos = sTemp.find(':');
+	size_t cpos = sTemp.find(':');
 
-	if (cpos == -1)
+	if (cpos == sTemp.npos)
 	{
 		// no colon?!
 	}
 	else
 	{
 		// lower case the header field name
-		for (unsigned i=0; i<cpos; i++)
+		for (size_t i=0; i<cpos; i++)
 		{
 			if (sTemp[i] >= 'A' && sTemp[i] <= 'Z')
 				sTemp[i] += 'a'-'A';
