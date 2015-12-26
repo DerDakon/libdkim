@@ -1,13 +1,12 @@
 # libdkim makefile for UNIX
 #
 
-#ifdef LINUX
 CFLAGS  = -c
 LFLAGS  = 
+
+#ifdef LINUX
 LIBS    = -lcrypto -lresolv
 #else
-CFLAGS  = -c
-LFLAGS  = 
 LIBS    = -lcrypto 
 #endif
 
