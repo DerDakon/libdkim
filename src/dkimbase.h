@@ -58,7 +58,7 @@ public:
 	static string RelaxHeader( const string& sHeader );
 
 	virtual int ProcessHeaders(void);
-	virtual int ProcessBody( char* szBuffer, int nBufLength, bool bEOF );
+	virtual int ProcessBody( char* szBuffer, int nBufLength, bool bEOF ) = 0;
 
 protected:
 	char* m_From;
