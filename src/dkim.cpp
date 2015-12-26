@@ -98,7 +98,7 @@ int DKIM_CALL DKIMSignInit( DKIMContext* pSignContext, DKIMSignOptions* pOptions
 }
 
 
-int DKIM_CALL DKIMSignProcess( DKIMContext* pSignContext, const char* szBuffer, int nBufLength )
+int DKIM_CALL DKIMSignProcess( DKIMContext *pSignContext, const char *szBuffer, size_t nBufLength )
 {
 	CDKIMSign* pSign = (CDKIMSign*)ValidateContext( pSignContext, true );
 
@@ -172,7 +172,7 @@ int DKIM_CALL DKIMVerifyInit( DKIMContext* pVerifyContext, DKIMVerifyOptions* pO
 }
 
 
-int DKIM_CALL DKIMVerifyProcess( DKIMContext *pVerifyContext, const char *szBuffer, int nBufLength )
+int DKIM_CALL DKIMVerifyProcess( DKIMContext *pVerifyContext, const char *szBuffer, size_t nBufLength )
 {
 	CDKIMVerify* pVerify = (CDKIMVerify*)ValidateContext( pVerifyContext, false );
 

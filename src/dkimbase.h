@@ -41,7 +41,7 @@ public:
 
 	int Init(void);
 
-	int Process( const char* szBuffer, int nBufLength, bool bEOF );
+	int Process( const char* szBuffer, size_t nBufLength, bool bEOF );
 	int ProcessFinal(void);
 
 	int Alloc( char*& szBuffer, int nRequiredSize );

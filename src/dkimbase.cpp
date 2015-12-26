@@ -118,7 +118,7 @@ void CDKIMBase::Free( char* szBuffer )
 // Process - split buffers into lines without any CRs or LFs at the end.
 //
 ////////////////////////////////////////////////////////////////////////////////
-int CDKIMBase::Process( const char* szBuffer, int nBufLength, bool bEOF )
+int CDKIMBase::Process( const char *szBuffer, size_t nBufLength, bool bEOF )
 {
 	const char* p = szBuffer;
 	const char* e = szBuffer + nBufLength;
