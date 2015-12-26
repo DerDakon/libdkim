@@ -35,6 +35,4 @@ libdkimtest.o: libdkimtest.cpp $(HDRS)
 	g++ $(CFLAGS) -c $<
 
 clean:
-	rm  *.o libdkim.lib libdkimtest
-
-
+	rm -f *.o libdkim.a libdkimtest
