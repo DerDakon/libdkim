@@ -226,13 +226,13 @@ void DKIM_CALL DKIMVerifyFree( DKIMContext* pVerifyContext )
 }
 
 
-char* DKIM_CALL DKIMVersion()
+const char* DKIM_CALL DKIMVersion()
 {
 	return VERSION_STRING;
 }
 
 
-static char* DKIMErrorStrings[-1-DKIM_MAX_ERROR] = {
+static const char* DKIMErrorStrings[-1-DKIM_MAX_ERROR] = {
 	"DKIM_FAIL",
 	"DKIM_BAD_SYNTAX",
 	"DKIM_SIGNATURE_BAD",
@@ -259,7 +259,7 @@ static char* DKIMErrorStrings[-1-DKIM_MAX_ERROR] = {
 };
 
 
-char* DKIM_CALL DKIMGetErrorString( int ErrorCode )
+const char* DKIM_CALL DKIMGetErrorString( int ErrorCode )
 {
 	if (ErrorCode >= 0 || ErrorCode <= DKIM_MAX_ERROR)
 		return "Unknown";

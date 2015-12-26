@@ -159,9 +159,9 @@ int DKIM_CALL DKIMVerifyResults( DKIMContext* pVerifyContext );
 int DKIM_CALL DKIMVerifyGetDetails( DKIMContext* pVerifyContext, int* nSigCount, DKIMVerifyDetails** pDetails, char* szPractices );
 void DKIM_CALL DKIMVerifyFree( DKIMContext* pVerifyContext );
 
-char *DKIM_CALL DKIMVersion();
+const char * DKIMVersion();
 
-char *DKIM_CALL DKIMGetErrorString( int ErrorCode );
+const char *DKIM_CALL DKIMGetErrorString( int ErrorCode );
 
 #ifdef __cplusplus
 }

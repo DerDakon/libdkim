@@ -60,9 +60,9 @@ int DKIM_CALL SelectorCallback(const char* szFQDN, char* szBuffer, int nBufLen )
 int main(int argc, char* argv[])
 {
 	int n;
-	char* PrivKeyFile = "test.pem";
-	char* MsgFile = "test.msg";
-	char* OutFile = "signed.msg";
+	const char* PrivKeyFile = "test.pem";
+	const char* MsgFile = "test.msg";
+	const char* OutFile = "signed.msg";
 	int nPrivKeyLen;
 	char PrivKey[2048];
 	char Buffer[1024];
