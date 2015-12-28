@@ -144,8 +144,8 @@ void DKIM_CALL DKIMSignFree( DKIMContext* pSignContext )
 
 	if( pSign )
 	{
-		delete pSign;
 		pSignContext->reserved3 = NULL;
+		delete pSign;
 	}
 }
 
