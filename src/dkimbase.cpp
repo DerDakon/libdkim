@@ -47,10 +47,10 @@ CDKIMBase::CDKIMBase()
 
 CDKIMBase::~CDKIMBase()
 {
-	Free( m_Line );
-	Free( m_From );
-	Free( m_Sender );
-	Free( m_hTag );
+	delete[] m_Line;
+	delete[] m_From;
+	delete[] m_Sender;
+	delete[] m_hTag;
 }
 
 int CDKIMBase::Init(void)
@@ -100,16 +100,6 @@ int CDKIMBase::ReAlloc( char*& szBuffer, int& nBufferSize, int nRequiredSize )
 	}
 
 	return DKIM_SUCCESS;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// 
-// Process - split buffers into lines without any CRs or LFs at the end.
-//
-////////////////////////////////////////////////////////////////////////////////
-void CDKIMBase::Free( char* szBuffer )
-{
-	delete[] szBuffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -46,7 +46,6 @@ public:
 
 	int Alloc( char*& szBuffer, int nRequiredSize );
 	int ReAlloc( char*& szBuffer, int& nBufferLength, int nRequiredSize );
-	void Free( char* szBuffer );
 
 	static void RemoveSWSP( char* szBuffer );
 	static void RemoveSWSP( char* pBuffer, int& nBufLength );
