@@ -33,16 +33,16 @@
 
 
 CDKIMBase::CDKIMBase()
+	: m_From(NULL)
+	, m_Sender(NULL)
+	, m_hTag(NULL)
+	, m_hTagSize(0)
+	, m_hTagPos(0)
+	, m_Line(NULL)
+	, m_LineSize(0)
+	, m_LinePos(0)
+	, m_InHeaders(true)
 {
-	m_From = NULL;
-	m_Sender = NULL;
-	m_hTag = NULL;
-	m_hTagSize = 0;
-	m_hTagPos = 0;
-	m_Line = NULL;
-	m_LineSize = 0;
-	m_LinePos = 0;
-	m_InHeaders = true;
 }
 
 CDKIMBase::~CDKIMBase()

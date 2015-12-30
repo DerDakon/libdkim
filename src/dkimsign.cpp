@@ -37,10 +37,9 @@
 
 
 CDKIMSign::CDKIMSign()
+	: m_EmptyLineCount(0)
+	, m_pfnHdrCallback(NULL)
 {
-	m_EmptyLineCount = 0;
-	m_pfnHdrCallback = NULL;
-
 	EVP_SignInit( &m_allman_sha1ctx, EVP_sha1() );
 	EVP_SignInit( &m_Hdr_ietf_sha1ctx, EVP_sha1() );
 	EVP_SignInit( &m_Hdr_ietf_sha256ctx, EVP_sha256() );

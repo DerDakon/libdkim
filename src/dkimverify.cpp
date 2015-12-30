@@ -40,16 +40,16 @@
 
 
 SignatureInfo::SignatureInfo(bool s)
+	: VerifiedBodyCount(0)
+	, UnverifiedBodyCount(0)
+	, m_pSelector(NULL)
+	, Status(DKIM_SUCCESS)
+	, m_nHash(0)
+	, EmptyLineCount(0)
+	, m_SaveCanonicalizedData(s)
 {
-	VerifiedBodyCount = 0;
-	UnverifiedBodyCount = 0;
 	EVP_MD_CTX_init( &m_Hdr_ctx );
 	EVP_MD_CTX_init( &m_Bdy_ctx );
-	m_pSelector = NULL;
-	Status = DKIM_SUCCESS;
-	m_nHash = 0;
-	EmptyLineCount = 0;
-	m_SaveCanonicalizedData = s;
 }
 
 SignatureInfo::~SignatureInfo()
@@ -391,14 +391,14 @@ bool ParseAddresses( string str, vector<string> &Addresses )
 
 
 CDKIMVerify::CDKIMVerify()
+	: m_pfnSelectorCallback(NULL)
+	, m_pfnPracticesCallback(NULL)
+	, m_HonorBodyLengthTag(false)
+	, m_CheckPractices(false)
+	, m_SubjectIsRequired(true)
+	, m_SaveCanonicalizedData(false)
+	, m_AllowUnsignedFromHeaders(false)
 {
-	m_pfnSelectorCallback = NULL;
-	m_pfnPracticesCallback = NULL;
-	m_HonorBodyLengthTag = false;
-	m_CheckPractices = false;
-	m_SubjectIsRequired = true;
-	m_SaveCanonicalizedData = false;
-	m_AllowUnsignedFromHeaders = false;
 }
 
 CDKIMVerify::~CDKIMVerify()
@@ -1197,14 +1197,16 @@ int CDKIMVerify::ProcessBody( char* szBuffer, int nBufLength, bool bEOF )
 }
 
 
-SelectorInfo::SelectorInfo(const string &sSelector, const string &sDomain) : Selector(sSelector), Domain(sDomain)
+SelectorInfo::SelectorInfo(const string &sSelector, const string &sDomain)
+	: Selector(sSelector)
+	, Domain(sDomain)
+	, AllowSHA1(true)
+	, AllowSHA256(true)
+	, PublicKey(NULL)
+	, Testing(false)
+	, SameDomain(false)
+	, Status(DKIM_SUCCESS)
 {
-	AllowSHA1 = true;
-	AllowSHA256 = true;
-	PublicKey = NULL;
-	Testing = false;
-	SameDomain = false;
-	Status = DKIM_SUCCESS;
 }
 
 SelectorInfo::~SelectorInfo()
