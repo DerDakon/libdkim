@@ -395,7 +395,7 @@ CDKIMVerify::CDKIMVerify()
 	, m_pfnPracticesCallback(NULL)
 	, m_HonorBodyLengthTag(false)
 	, m_CheckPractices(false)
-	, m_SubjectIsRequired(true)
+	, m_SubjectIsRequired(false)
 	, m_SaveCanonicalizedData(false)
 	, m_AllowUnsignedFromHeaders(false)
 {
@@ -426,7 +426,7 @@ int CDKIMVerify::Init( DKIMVerifyOptions* pOptions )
 
 	m_HonorBodyLengthTag = pOptions->nHonorBodyLengthTag != 0;
 	m_CheckPractices = pOptions->nCheckPractices != 0;
-	m_SubjectIsRequired = pOptions->nSubjectRequired == 0;
+	m_SubjectIsRequired = pOptions->nSubjectRequired == 1;
 	m_SaveCanonicalizedData = pOptions->nSaveCanonicalizedData != 0;
 	m_AllowUnsignedFromHeaders = pOptions->nAllowUnsignedFromHeaders != 0;
 
