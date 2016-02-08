@@ -334,7 +334,7 @@ int main(int argc, char* argv[])
 			if( pDetails[i].nResult >= 0 )
 				printf( "Success\n" );
 			else
-				printf( "Failure\n" );
+				printf( "Failure %i\n", pDetails[i].nResult );
 		}
 
 		DKIMVerifyFree( &ctxt );
